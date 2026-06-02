@@ -1,0 +1,1097 @@
+.Dd $DATE$
+.Dt SEHN 1
+.Os
+.
+.
+.Sh NAME
+.
+.Nm sehn
+.Nd Simple, Minimal Camera Viewer
+.
+.
+.Sh SYNOPSIS
+.
+.Nm
+.Op Ar options
+.Op Cm \-\-
+.Op Ar device
+.
+.
+.Sh VERSION
+.
+This manual documents
+.Nm
+$VERSION$
+.
+.Pp
+.
+Compile-time switches in this build:
+.
+.Bl -bullet -compact
+.
+.It
+libexif EXIF metadata support $MAN_EXIF$
+.
+.It
+libcurl remote stream support $MAN_CURL$
+.
+.It
+Xinerama multi-monitor support $MAN_XINERAMA$
+.
+.It
+inotify device hotplug detection $MAN_INOTIFY$
+.
+.It
+V4L2 extended controls $MAN_V4L2_EXT$
+.
+.El
+.
+$MAN_DEBUG$
+.
+.
+.Sh DESCRIPTION
+.
+.Nm
+is a light-weight, configurable camera viewer and capture tool for X11.
+It is inspired by
+.Xr feh 1
+and follows the same philosophy: no toolkits, no bloat, do one thing well.
+.
+.Pp
+.
+.Nm
+opens a frameless window showing a live viewfinder feed from a V4L2 camera
+device.
+A minimal panel on the right side of the window provides a capture button,
+a mode selector, and a hamburger menu.
+Everything is configurable via a TOML config file and command-line options.
+.
+.Pp
+.
+When no device is specified,
+.Nm
+will use the device listed in the config file, falling back to
+.Pa /dev/video0 .
+.
+.
+.Sh MODES
+.
+.Nm
+supports several capture and display modes, selectable at startup or at runtime.
+.
+.Pp
+.
+.Em Photo mode
+is the default.
+The viewfinder runs live and pressing the capture key or button saves a still
+image to disk.
+.
+.Pp
+.
+.Em Burst mode
+captures a rapid sequence of images on a single trigger.
+The number of frames and the interval are configurable.
+.
+.Pp
+.
+.Em Video mode
+records a video file to disk while active.
+Press the capture key to start and stop recording.
+A recording indicator is shown in the overlay.
+.
+.Pp
+.
+.Em Preview mode
+opens a read-only viewfinder with no capture capability.
+Useful for framing or monitoring.
+.
+.Pp
+.
+.Em List mode
+does not open a window.
+Instead it prints all available V4L2 devices and their supported formats,
+resolutions, and framerates to stdout, then exits.
+.
+.
+.Sh OPTIONS
+.
+.Bl -tag -width indent
+.
+.It Cm \-d , \-\-device Ar path
+.
+Use
+.Ar path
+as the camera device.
+Defaults to the value in the config file, or
+.Pa /dev/video0
+if unset.
+.
+.It Cm \-o , \-\-output\-dir Ar directory
+.
+Save captured images and videos to
+.Ar directory .
+Overrides the config file value.
+Defaults to the current working directory.
+.
+.It Cm \-f , \-\-format Ar fmt
+.
+Request capture format
+.Ar fmt
+from the camera.
+Accepted values:
+.Cm mjpeg , yuyv , nv12 , h264 .
+.Nm
+will negotiate the closest supported format if the requested one is unavailable.
+.
+.It Cm \-r , \-\-resolution Ar WxH
+.
+Request capture resolution
+.Ar W x H .
+E.g.
+.Qq 1920x1080 .
+.Nm
+will negotiate the closest resolution the device supports.
+.
+.It Cm \-R , \-\-framerate Ar fps
+.
+Request
+.Ar fps
+frames per second from the device.
+Negotiated downward if unsupported.
+Default: 30.
+.
+.It Cm \-F , \-\-fullscreen
+.
+Open the viewfinder in fullscreen mode.
+The panel is hidden by default in this mode; press
+.Cm Tab
+to toggle it.
+.
+.It Cm \-x , \-\-borderless
+.
+Open without window decorations.
+.
+.It Cm \-g , \-\-geometry Ar WxH Ns Op Cm + Ns Ar X Ns Cm + Ns Ar Y
+.
+Set initial window size and optional position.
+E.g.
+.Qq 960x540+100+50 .
+.
+.It Cm \-\-no\-panel
+.
+Hide the right-side panel entirely.
+All interaction will be through keybindings only.
+.
+.It Cm \-\-panel\-width Ar pixels
+.
+Set the width of the right-side panel in pixels.
+Default: 64.
+.
+.It Cm \-m , \-\-mode Ar mode
+.
+Start in the specified mode.
+Accepted values:
+.Cm photo , burst , video , preview .
+Default:
+.Cm photo .
+.
+.It Cm \-T , \-\-theme Ar name
+.
+Load a named theme from the config file.
+See
+.Sx THEMES
+for details.
+.
+.It Cm \-\-hide\-pointer
+.
+Hide the mouse cursor inside the viewfinder window.
+.
+.It Cm \-\-overlay
+.
+Enable the info overlay.
+Shows current mode, resolution, framerate, and timestamp in the corner of the
+viewfinder.
+.
+.It Cm \-\-no\-overlay
+.
+Disable the info overlay, even if enabled in the config file.
+.
+.It Cm \-\-overlay\-tint
+.
+Draw the info overlay on a semi-transparent background for readability.
+.
+.It Cm \-\-overlay\-pos Ar position
+.
+Set position of the info overlay.
+Accepted values:
+.Cm topleft , topright , bottomleft , bottomright .
+Default:
+.Cm bottomleft .
+.
+.It Cm \-\-filename Ar pattern
+.
+Set the filename pattern used when saving images or videos.
+Supports
+.Sx FORMAT SPECIFIERS .
+Default:
+.Qq sehn_%Y%m%d_%H%M%S_%c .
+.
+.It Cm \-\-jpeg\-quality Ar n
+.
+Set JPEG output quality from 1 to 100.
+Default: 92.
+.
+.It Cm \-\-png\-compression Ar n
+.
+Set PNG compression level from 0 to 9.
+Default: 6.
+.
+.It Cm \-\-save\-format Ar fmt
+.
+Format for saved still images.
+Accepted values:
+.Cm jpeg , png .
+Default:
+.Cm jpeg .
+.
+.It Cm \-\-video\-format Ar fmt
+.
+Container format for saved video.
+Accepted values:
+.Cm mkv , mp4 , avi .
+Default:
+.Cm mkv .
+.
+.It Cm \-\-burst\-count Ar n
+.
+Number of frames to capture in burst mode.
+Default: 10.
+.
+.It Cm \-\-burst\-interval Ar ms
+.
+Milliseconds between frames in burst mode.
+Default: 100.
+.
+.It Cm \-\-zoom Ar percent | Cm fit | Cm fill
+.
+Initial zoom level for the viewfinder.
+.Cm fit
+scales to fill the window while preserving aspect ratio.
+.Cm fill
+crops to fill the window entirely.
+Default:
+.Cm fit .
+.
+.It Cm \-\-flip Ar direction
+.
+Flip the viewfinder output.
+Accepted values:
+.Cm horizontal , vertical , both .
+Does not affect saved images unless
+.Cm \-\-flip\-save
+is also set.
+.
+.It Cm \-\-flip\-save
+.
+Apply flip transformation to saved images and videos as well as the viewfinder.
+.
+.It Cm \-\-rotate Ar degrees
+.
+Rotate the viewfinder by
+.Ar degrees .
+Accepted values:
+.Cm 0 , 90 , 180 , 270 .
+Does not affect saved images unless
+.Cm \-\-rotate\-save
+is also set.
+.
+.It Cm \-\-rotate\-save
+.
+Apply rotation to saved images and videos as well as the viewfinder.
+.
+.It Cm \-\-brightness Ar n
+.
+Set camera brightness, if supported by the device.
+Range: -100 to 100. Default: 0.
+.
+.It Cm \-\-contrast Ar n
+.
+Set camera contrast, if supported by the device.
+Range: -100 to 100. Default: 0.
+.
+.It Cm \-\-saturation Ar n
+.
+Set camera saturation, if supported by the device.
+Range: -100 to 100. Default: 0.
+.
+.It Cm \-\-sharpness Ar n
+.
+Set camera sharpness, if supported by the device.
+Range: -100 to 100. Default: 0.
+.
+.It Cm \-\-exposure Ar mode
+.
+Set exposure mode.
+Accepted values:
+.Cm auto , manual .
+Default:
+.Cm auto .
+.
+.It Cm \-\-exposure\-time Ar us
+.
+Set manual exposure time in microseconds.
+Only effective when
+.Cm \-\-exposure manual
+is set.
+.
+.It Cm \-\-gain Ar n
+.
+Set manual sensor gain.
+Only effective when
+.Cm \-\-exposure manual
+is set.
+.
+.It Cm \-\-wb Ar mode
+.
+Set white balance mode.
+Accepted values:
+.Cm auto , manual .
+.
+.It Cm \-\-wb\-temp Ar kelvin
+.
+Set white balance colour temperature in Kelvin.
+Only effective when
+.Cm \-\-wb manual
+is set.
+.
+.It Cm \-\-autofocus
+.
+Enable continuous autofocus, if supported by the device.
+.
+.It Cm \-\-no\-autofocus
+.
+Disable autofocus.
+.
+.It Cm \-\-focus Ar n
+.
+Set manual focus distance.
+Range and units are device-dependent.
+.
+.It Cm \-\-list\-devices
+.
+Print all detected V4L2 devices and exit.
+.
+.It Cm \-\-list\-formats
+.
+Print all formats, resolutions, and framerates supported by the selected device
+and exit.
+.
+.It Cm \-\-list\-controls
+.
+Print all V4L2 controls available on the selected device and their current
+values and exit.
+.
+.It Cm \-\-exif
+.
+.Pq optional feature, $MAN_EXIF$ in this build
+Write EXIF metadata to saved images.
+Includes timestamp, device name, resolution, exposure, and gain where available.
+.
+.It Cm \-\-no\-exif
+.
+Do not write EXIF metadata, even if enabled in the config file.
+.
+.It Cm \-\-xinerama\-index Ar monitor
+.
+.Pq optional feature, $MAN_XINERAMA$ in this build
+Open the viewfinder on the specified Xinerama monitor index.
+Use
+.Cm xrandr \-\-listmonitors
+to list available indices.
+.
+.It Cm \-\-no\-xinerama
+.
+.Pq optional feature, $MAN_XINERAMA$ in this build
+Treat the entire X display as a single monitor.
+.
+.It Cm \-c , \-\-config Ar file
+.
+Load config from
+.Ar file
+instead of the default location.
+See
+.Sx CONFIGURATION .
+.
+.It Cm \-\-print\-config
+.
+Print the resolved config (defaults + config file + command line) to stdout
+in TOML format and exit.
+Useful for generating a config file from current settings.
+.
+.It Cm \-q , \-\-quiet
+.
+Suppress non-fatal warnings.
+.
+.It Cm \-V , \-\-verbose
+.
+Print device negotiation, format selection, and frame statistics to stderr.
+.
+.It Cm \-v , \-\-version
+.
+Print version and exit.
+.
+.It Cm \-h , \-\-help
+.
+Print a short usage summary and exit.
+.
+.El
+.
+.
+.Sh FORMAT SPECIFIERS
+.
+Format specifiers are supported in
+.Cm \-\-filename
+and overlay text.
+.
+.Bl -tag -width indent
+.
+.It %Y , %m , %d , %H , %M , %S
+.
+Standard strftime date/time components.
+.
+.It %c
+.
+Capture counter, incremented per session.
+Zero-padded to 4 digits.
+.
+.It %C
+.
+Global capture counter, incremented across sessions.
+Stored in
+.Pa $XDG_DATA_HOME/sehn/counter .
+.
+.It %D
+.
+Device basename.
+E.g.
+.Qq video0
+for
+.Pa /dev/video0 .
+.
+.It %f
+.
+Current save format.
+E.g.
+.Qq jpeg .
+.
+.It %F
+.
+Full output path of the saved file.
+.
+.It %m
+.
+Current mode.
+E.g.
+.Qq photo .
+.
+.It %r
+.
+Current resolution as WxH.
+E.g.
+.Qq 1920x1080 .
+.
+.It %R
+.
+Current framerate.
+.
+.It %z
+.
+Current zoom level as a percentage.
+.
+.It %v
+.
+.Nm
+version string.
+.
+.It %V
+.
+Process ID.
+.
+.It %%
+.
+A literal
+.Qq % .
+.
+.El
+.
+.
+.Sh KEYS
+.
+The following actions and their default key bindings are available in the
+viewfinder window.
+The strings in
+.Bq square brackets
+are the action names used in the keys config.
+.
+.Bl -tag -width indent
+.
+.It Ao space Ac , Cm c Bq capture
+.
+Capture a still image
+.Pq photo mode
+or toggle recording
+.Pq video mode .
+.
+.It Cm m Bq next_mode
+.
+Cycle to the next capture mode.
+.
+.It Cm M Bq prev_mode
+.
+Cycle to the previous capture mode.
+.
+.It Cm Tab Bq toggle_panel
+.
+Toggle the right-side panel.
+.
+.It Cm o Bq toggle_overlay
+.
+Toggle the info overlay.
+.
+.It Cm f Bq toggle_fullscreen
+.
+Toggle fullscreen.
+.
+.It Cm z Bq zoom_fit
+.
+Zoom viewfinder to fit window.
+.
+.It Cm Z Bq zoom_fill
+.
+Zoom viewfinder to fill window.
+.
+.It Cm * Bq zoom_100
+.
+Set zoom to 100%.
+.
+.It Cm + , Ao keypad + Ac Bq zoom_in
+.
+Zoom in.
+.
+.It Cm \- , Ao keypad \- Ac Bq zoom_out
+.
+Zoom out.
+.
+.It Ao Left Ac Ao Right Ac Ao Up Ac Ao Down Ac Bq pan_left , pan_right , pan_up , pan_down
+.
+Pan the viewfinder when zoomed in.
+.
+.It Cm h Bq flip_horizontal
+.
+Toggle horizontal flip of the viewfinder.
+.
+.It Cm v Bq flip_vertical
+.
+Toggle vertical flip of the viewfinder.
+.
+.It Cm r Bq rotate_cw
+.
+Rotate viewfinder 90 degrees clockwise.
+.
+.It Cm R Bq rotate_ccw
+.
+Rotate viewfinder 90 degrees counter-clockwise.
+.
+.It Cm e Bq toggle_exposure
+.
+Toggle between auto and manual exposure.
+.
+.It Cm [ , ] Bq exposure_down , exposure_up
+.
+Decrease or increase manual exposure time.
+.
+.It Cm { , } Bq gain_down , gain_up
+.
+Decrease or increase manual gain.
+.
+.It Cm w Bq toggle_wb
+.
+Toggle between auto and manual white balance.
+.
+.It Cm , , . Bq wb_cooler , wb_warmer
+.
+Shift white balance temperature cooler or warmer.
+.
+.It Cm a Bq toggle_autofocus
+.
+Toggle autofocus, if supported.
+.
+.It Cm i Bq toggle_info
+.
+Toggle the device info panel showing current V4L2 control values.
+.
+.It Cm l Bq list_devices
+.
+Print available V4L2 devices to the terminal.
+.
+.It Cm d Bq show_device
+.
+Show current device path and negotiated format in the overlay.
+.
+.It Cm s Bq save_config
+.
+Save current settings to the config file.
+.
+.It Cm q , Ao Escape Ac Bq quit
+.
+Quit
+.Nm .
+.
+.El
+.
+.Ss MENU KEYS
+.
+.Bl -tag -width indent
+.
+.It Ao Escape Ac Bq menu_close
+.
+Close the menu.
+.
+.It Ao Up Ac , Ao Down Ac Bq menu_up , menu_down
+.
+Navigate menu items.
+.
+.It Ao Left Ac , Ao Right Ac Bq menu_parent , menu_child
+.
+Navigate submenus.
+.
+.It Ao Return Ac , Ao space Ac Bq menu_select
+.
+Select the highlighted item.
+.
+.El
+.
+.
+.Sh MOUSE ACTIONS
+.
+.Bl -tag -width indent
+.
+.It Button 1 Bq pan
+.
+Click and drag to pan the viewfinder when zoomed in.
+A click without movement triggers capture in photo mode.
+.
+.It Button 2 Bq zoom
+.
+Click and drag right to zoom in, left to zoom out.
+Click without movement to reset to fit.
+.
+.It Button 3 Bq toggle_menu
+.
+Open/close the hamburger menu.
+.
+.It Scroll up Bq zoom_in
+.
+Zoom in.
+.
+.It Scroll down Bq zoom_out
+.
+Zoom out.
+.
+.It Ctrl+Scroll Bq exposure_adjust
+.
+Adjust exposure when in manual mode.
+.
+.El
+.
+.
+.Sh CONFIGURATION
+.
+.Nm
+reads its configuration from
+.Pa $XDG_CONFIG_HOME/sehn/sehnrc.toml ,
+which defaults to
+.Pa ~/.config/sehn/sehnrc.toml
+when
+.Ev XDG_CONFIG_HOME
+is unset.
+If that file does not exist,
+.Nm
+will also check
+.Pa /etc/sehn/sehnrc.toml .
+.
+.Pp
+.
+All command-line options override config file values.
+Use
+.Cm \-\-print\-config
+to inspect the resolved configuration.
+.
+.Pp
+.
+The config is a standard TOML file.
+An example:
+.
+.Bd -literal -offset indent
+[camera]
+device = "/dev/video0"
+format = "mjpeg"
+resolution = "1920x1080"
+framerate = 30
+autofocus = true
+exposure = "auto"
+wb = "auto"
+
+[capture]
+output_dir = "~/Pictures/sehn"
+filename = "sehn_%Y%m%d_%H%M%S_%c"
+save_format = "jpeg"
+jpeg_quality = 92
+png_compression = 6
+video_format = "mkv"
+burst_count = 10
+burst_interval = 100
+exif = true
+
+[ui]
+mode = "photo"
+fullscreen = false
+borderless = false
+panel = true
+panel_width = 64
+overlay = true
+overlay_pos = "bottomleft"
+overlay_tint = false
+hide_pointer = false
+zoom = "fit"
+
+[keybinds]
+capture       = "space"
+next_mode     = "m"
+prev_mode     = "M"
+toggle_panel  = "Tab"
+toggle_overlay = "o"
+toggle_fullscreen = "f"
+zoom_fit      = "z"
+zoom_fill     = "Z"
+zoom_100      = "asterisk"
+zoom_in       = "plus"
+zoom_out      = "minus"
+quit          = "q"
+.Ed
+.
+.
+.Sh THEMES
+.
+.Pa ~/.config/sehn/themes.toml
+allows named option groups, analogous to
+.Xr feh 1 Ns 's
+themes file.
+.
+.Pp
+.
+Each entry is a TOML table named after the theme, containing any subset of the
+config keys described in
+.Sx CONFIGURATION .
+.
+.Bd -literal -offset indent
+[studio]
+resolution = "1920x1080"
+framerate  = 30
+format     = "mjpeg"
+jpeg_quality = 98
+overlay    = false
+
+[webcam]
+device     = "/dev/video2"
+resolution = "1280x720"
+overlay    = true
+overlay_pos = "topright"
+.Ed
+.
+.Pp
+.
+Load a theme with
+.Cm \-T Ar name .
+Command-line options always override theme values.
+Like
+.Xr feh 1 ,
+.Nm
+can also be invoked via a symbolic link named after a theme, causing that
+theme to be loaded automatically.
+.
+.
+.Sh KEYS CONFIG SYNTAX
+.
+.Pa ~/.config/sehn/keys.toml
+defines custom key bindings.
+Each entry maps an action name to one or more X11 keysym strings.
+Multiple bindings for the same action are accepted.
+.
+.Bd -literal -offset indent
+[keys]
+capture          = ["space", "Return"]
+quit             = ["q", "Escape"]
+toggle_fullscreen = ["f", "F11"]
+zoom_in          = ["plus", "KP_Add"]
+zoom_out         = ["minus", "KP_Subtract"]
+.Ed
+.
+.Pp
+.
+Modifier prefixes follow the same convention as
+.Xr feh 1 :
+.Cm C\-
+for Control,
+.Cm S\-
+for Shift,
+.Cm 1\-
+for Mod1
+.Pq Alt ,
+.Cm 4\-
+for Mod4
+.Pq Super .
+Example:
+.Qq C\-s
+for Ctrl+S.
+.
+.Pp
+.
+Specifying an action with an empty list unbinds it entirely:
+.
+.Bd -literal -offset indent
+[keys]
+zoom_fill = []
+.Ed
+.
+.
+.Sh BUTTONS CONFIG SYNTAX
+.
+.Pa ~/.config/sehn/buttons.toml
+defines mouse button bindings in the same style.
+.
+.Bd -literal -offset indent
+[buttons]
+pan           = "1"
+zoom          = "2"
+toggle_menu   = "3"
+zoom_in       = "5"
+zoom_out      = "4"
+capture       = "C-1"
+.Ed
+.
+.
+.Sh SIGNALS
+.
+.Bl -tag -width indent
+.
+.It Dv SIGUSR1
+.
+Trigger a capture
+.Pq photo mode
+or start recording
+.Pq video mode .
+.
+.It Dv SIGUSR2
+.
+Cycle to the next mode.
+.
+.It Dv SIGHUP
+.
+Reload the config file and re-negotiate device settings.
+.
+.El
+.
+.
+.Sh ENVIRONMENT
+.
+.Bl -tag -width indent
+.
+.It Ev XDG_CONFIG_HOME
+.
+Base directory for config files.
+Defaults to
+.Pa ~/.config .
+.
+.It Ev XDG_DATA_HOME
+.
+Base directory for data files
+.Pq e.g. global capture counter .
+Defaults to
+.Pa ~/.local/share .
+.
+.It Ev XDG_CACHE_HOME
+.
+Base directory for cache files.
+Defaults to
+.Pa ~/.cache .
+.
+.It Ev SEHN_SKIP_NEGOTIATION
+.
+When set, skip V4L2 format negotiation and use the requested format verbatim,
+even if the device reports it as unsupported.
+May cause errors.
+.
+.El
+.
+.
+.Sh FILES
+.
+.Bl -tag -width indent
+.
+.It Pa ~/.config/sehn/sehnrc.toml
+.
+Main config file.
+.
+.It Pa ~/.config/sehn/themes.toml
+.
+Named themes.
+.
+.It Pa ~/.config/sehn/keys.toml
+.
+Key bindings.
+.
+.It Pa ~/.config/sehn/buttons.toml
+.
+Mouse button bindings.
+.
+.It Pa ~/.local/share/sehn/counter
+.
+Global capture counter.
+.
+.El
+.
+.
+.Sh USAGE EXAMPLES
+.
+.Bl -tag -width indent
+.
+.It sehn
+.
+Open the default device
+.Pq /dev/video0
+in photo mode with settings from the config file.
+.
+.It sehn \-\-list\-devices
+.
+List all detected V4L2 camera devices and exit.
+.
+.It sehn \-\-list\-formats \-d /dev/video2
+.
+List all formats, resolutions, and framerates supported by /dev/video2.
+.
+.It sehn \-d /dev/video1 \-r 1280x720 \-R 60
+.
+Open /dev/video1 at 1280x720 @ 60fps.
+.
+.It sehn \-m burst \-\-burst\-count 20 \-\-burst\-interval 50
+.
+Start in burst mode, capturing 20 frames at 50ms intervals per trigger.
+.
+.It sehn \-F \-\-no\-panel
+.
+Open fullscreen with no panel. Keyboard-only operation.
+.
+.It sehn \-m video \-\-video\-format mp4 \-o ~/Videos
+.
+Start in video mode, saving mp4 files to ~/Videos.
+.
+.It sehn \-T studio
+.
+Load the "studio" theme from themes.toml.
+.
+.It sehn \-\-print\-config > ~/.config/sehn/sehnrc.toml
+.
+Bootstrap a config file from current defaults.
+.
+.It sehn \-\-exposure manual \-\-exposure\-time 10000 \-\-gain 200
+.
+Open with manual exposure, 10ms shutter time, and gain 200.
+.
+.It sehn \-x \-g 640x480+0+0 \-\-no\-panel \-\-overlay
+.
+Borderless 640x480 window at top-left with overlay, no panel.
+Useful as a floating webcam preview in a tiling WM.
+.
+.It ln \-s $(which sehn) ~/bin/webcam
+.
+Create a symlink so
+.Qq webcam
+loads the
+.Qq webcam
+theme automatically.
+.
+.El
+.
+.
+.Sh DEPENDENCIES
+.
+.Nm
+requires a V4L2-compatible camera device.
+.
+.Pp
+.
+libexif is an optional dependency for writing EXIF metadata to saved images.
+It is $MAN_EXIF$ in this build.
+.
+.Pp
+.
+libcurl is an optional dependency for MJPEG network stream input
+.Pq e.g. IP cameras via http:// URLs .
+It is $MAN_CURL$ in this build.
+.
+.
+.Sh SEE ALSO
+.
+.Xr feh 1 ,
+.Xr v4l2-ctl 1 ,
+.Xr ffmpeg 1 ,
+.Xr xev 1
+.
+.
+.Sh KNOWN BUGS
+.
+V4L2 format negotiation may silently fall back to a lower resolution or
+framerate than requested.
+Use
+.Cm \-\-verbose
+to see the negotiated parameters, and
+.Cm SEHN_SKIP_NEGOTIATION
+to force exact values.
+.
+.Pp
+.
+Manual exposure and gain controls depend entirely on the camera driver.
+Not all devices support them.
+Use
+.Cm \-\-list\-controls
+to check.
+.
+.Pp
+.
+Zoom and pan state are not preserved when switching modes.
+.
+.Ss REPORTING BUGS
+.
+Report bugs at
+.Aq https://github.com/yourusername/sehn/issues .
+.
+.Pp
+.
+Please include the output of
+.Cm sehn \-\-version ,
+.Cm sehn \-\-verbose \-\-list\-formats ,
+and steps to reproduce.
+.
+.
+.Sh LICENSE
+.
+MIT License. See source distribution for full text.
+.
+.Pp
+.
+.Nm
+is inspired by
+.Xr feh 1
+by Tom Gilbert and Birte Friesel.
+.Aq https://feh.finalrewind.org
