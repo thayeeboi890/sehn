@@ -1,0 +1,67 @@
+# .gitignore for sehn (C++ project using Meson)
+
+# Meson build directory and generated files
+/build/
+/build/**
+/meson-logs/
+/meson-private/
+/build/meson-info/
+
+# Build system files
+build.ninja
+compile_commands.json
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# Compiled object files and libraries
+*.o
+*.obj
+*.lo
+*.la
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+
+# Static analysis / coverage / profiling
+*.gcda
+*.gcno
+*.prof
+*.cover
+
+# Generated headers, config, caches
+build/config.h
+*.gch
+
+# Editor and IDE files
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# Backup and temp files
+*~
+*.swp
+*.swo
+*.bak
+*.orig
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Misc
+tags
+ctags
+
+# Node / environment
+node_modules/
+.env
+
