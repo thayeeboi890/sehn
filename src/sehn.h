@@ -22,3 +22,79 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 */
+
+#pragma once
+
+#include <string>
+#include <cstdint>
+
+// forward declarations
+struct CameraState;
+struct UIState;
+struct Config;
+
+enum class Mode {
+    Photo,
+    Burst,
+    Video,
+    Preview,
+};
+
+enum class ZoomMode {
+    Fit,
+    Fill,
+    Percent,
+};
+
+struct AppState {
+    // --- camera ---
+    std::string device;      
+    int         camera_fd;      
+    uint32_t    width;
+    uint32_t    height;
+    uint32_t    framerate;
+    std::string v4l2_format;   
+
+    // --- mode ---
+    Mode        mode;
+    bool        recording;    
+    bool        paused;      
+
+    // --- ui ---
+    bool        fullscreen;
+    bool        borderless;
+    bool        panel_visible;
+    bool        overlay_visible;
+    bool        hide_pointer;
+    int         panel_width;
+    int         win_w, win_h;
+
+    // --- zoom/pan ---
+    ZoomMode    zoom_mode;
+    float       zoom;       
+    int         pan_x, pan_y;
+
+    // --- capture ---
+    std::string output_dir;
+    std::string filename_pattern;
+    std::string save_format;    
+    int         jpeg_quality;
+    int         png_compression;
+    int         burst_count;
+    int         burst_interval_ms;
+
+    // --- camera controls ---
+    bool        autofocus;
+    std::string exposure_mode; 
+    int         exposure_time;
+    int         gain;
+    std::string wb_mode;     
+    int         wb_temp;    
+
+    // --- misc ---
+    bool        verbose;
+    bool        quiet;
+    bool        running;   
+};
+
+AppState make_default_state();
