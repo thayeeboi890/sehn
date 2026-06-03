@@ -82,6 +82,7 @@ struct AppState {
     int         png_compression;
     int         burst_count;
     int         burst_interval_ms;
+    std::string video_format; 
 
     // --- camera controls ---
     bool        autofocus;
@@ -91,10 +92,23 @@ struct AppState {
     std::string wb_mode;     
     int         wb_temp;    
 
+    // --- signals ---
+    volatile bool sig_capture;
+    volatile bool sig_next_mode;
+    volatile bool sig_reload_config;
+
+    // --- early exit flags ---
+    bool list_devices_and_exit; 
+    bool list_formats_and_exit;
+    bool list_controls_and_exit;
+    bool print_config_and_exit;
+
     // --- misc ---
     bool        verbose;
     bool        quiet;
     bool        running;   
+    std::string theme;        
+    std::string config_path; 
 };
 
 AppState make_default_state();
