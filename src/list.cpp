@@ -22,3 +22,27 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 */
+
+#include "list.h"
+#include <cstdio>
+
+int list_devices() {
+    // TODO: scan /sys/class/video4linux/, print each device and its name
+    printf("(list_devices not yet implemented)\n");
+    return 1;
+}
+
+int list_formats(const char *device) {
+    (void)device;
+    // TODO: open device, VIDIOC_ENUM_FMT, VIDIOC_ENUM_FRAMESIZES,
+    //       VIDIOC_ENUM_FRAMEINTERVALS, print results
+    printf("(list_formats not yet implemented)\n");
+    return 1;
+}
+
+int list_controls(const char *device) {
+    (void)device;
+    // TODO: open device, walk VIDIOC_QUERYCTRL, print name/min/max/current
+    printf("(list_controls not yet implemented)\n");
+    return 1;
+}

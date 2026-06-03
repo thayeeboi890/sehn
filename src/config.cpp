@@ -1,4 +1,4 @@
-/* signals.cpp
+/* config.cpp
 
 Copyright (C) 2026 Santiago Silva.
 
@@ -23,34 +23,25 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 */
 
-#include "signals.h"
-#include <csignal>
+#include "config.h"
 #include <cstdio>
 
-// Module-level pointer so the C signal handlers can reach state.
-// Only one AppState ever exists, so this is fine.
-static AppState *g_state = nullptr;
-
-static void handle_sigusr1(int) {
-    // TODO: set a flag on g_state to trigger capture / next frame
-}
-
-static void handle_sigusr2(int) {
-    // TODO: set a flag on g_state to cycle mode
-}
-
-static void handle_sighup(int) {
-    // TODO: set a flag on g_state to reload config
-}
-
-void signals_init(AppState *state) {
-    g_state = state;
-    std::signal(SIGUSR1, handle_sigusr1);
-    std::signal(SIGUSR2, handle_sigusr2);
-    std::signal(SIGHUP,  handle_sighup);
-}
-
-void signals_dispatch(AppState *state) {
+int config_load(AppState *state, const char *path) {
     (void)state;
-    // TODO: check flags set by handlers and call the right functions
+    (void)path;
+    // TODO: find config file, parse TOML, populate state
+    return -1; // file not found is non-fatal, so -1 is fine for now
+}
+
+int config_apply_theme(AppState *state, const char *theme_name) {
+    (void)state;
+    (void)theme_name;
+    // TODO: open themes.toml, find table [theme_name], merge into state
+    return 0;
+}
+
+void config_print(const AppState *state) {
+    (void)state;
+    // TODO: walk state fields and print as TOML
+    printf("# sehn config (not yet implemented)\n");
 }

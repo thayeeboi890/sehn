@@ -22,3 +22,17 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 */
+
+#pragma once
+
+// List all V4L2 devices found on the system to stdout.
+// Returns 0 if at least one device was found, 1 if none.
+int list_devices();
+
+// List all formats, resolutions, and framerates for a given device.
+// Returns 0 on success, 1 if device could not be opened.
+int list_formats(const char *device);
+
+// List all V4L2 controls and their current values for a given device.
+// Returns 0 on success, 1 if device could not be opened.
+int list_controls(const char *device);
