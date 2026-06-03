@@ -36,9 +36,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/keysym.h>
+#include <X11/Xatom.h>
+#include <X11/extensions/XShm.h>
+
 #include <sys/ipc.h>
 #include <sys/shm.h>
-#include <X11/extensions/XShm.h>
 
 struct UIState {
     Display            *dpy;
@@ -242,6 +244,30 @@ int ui_run(AppState *state) {
 
     ui.gc = XCreateGC(ui.dpy, ui.win, 0, nullptr);
     XMapWindow(ui.dpy, ui.win);
+    if (state->borderless) {
+        struct {
+            unsigned long flags, functions, decorations;
+            long input_mode;
+            unsigned long status;
+        } hints = { 2, 0, 0, 0, 0 };
+        Atom mwm = XInternAtom(ui.dpy, "_MOTIF_WM_HINTS", False);
+        XChangeProperty(ui.dpy, ui.win, mwm, mwm, 32,
+                        PropModeReplace, (unsigned char *)&hints, 5);
+    }
+    if (state->fullscreen) {
+        Atom wm_state    = XInternAtom(ui.dpy, "_NET_WM_STATE", False);
+        Atom wm_fullscr  = XInternAtom(ui.dpy, "_NET_WM_STATE_FULLSCREEN", False);
+        XChangeProperty(ui.dpy, ui.win, wm_state, XA_ATOM, 32,
+                        PropModeReplace, (unsigned char *)&wm_fullscr, 1);
+    }
+    if (state->hide_pointer) {
+        Pixmap blank = XCreatePixmap(ui.dpy, ui.win, 1, 1, 1);
+        XColor dummy = {};
+        Cursor cursor = XCreatePixmapCursor(ui.dpy, blank, blank,
+                                             &dummy, &dummy, 0, 0);
+        XDefineCursor(ui.dpy, ui.win, cursor);
+        XFreePixmap(ui.dpy, blank);
+    }    
     XFlush(ui.dpy);
 
     // try XShm, fall back to XPutImage
