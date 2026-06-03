@@ -25,6 +25,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
+void sehn_print_version();
+
 #define SEHN_VERSION        "0.1.0"
 #define SEHN_VERSION_MAJOR  0
 #define SEHN_VERSION_MINOR  1
