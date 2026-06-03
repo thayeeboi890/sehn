@@ -37,17 +37,16 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "camera.h"
 
 int main(int argc, char *argv[]) {
-
     // 1. start with defaults
     AppState state = make_default_state();
 
-    // 2. load config file (before CLI so CLI can override)
+    // 2. load config file
     config_load(&state, nullptr);
 
-    // 3. parse CLI — overrides config
+    // 3. parse CLI
     cli_parse(argc, argv, &state);
 
-    // 4. apply theme if one was requested
+    // 4. apply theme
     if (!state.theme.empty())
         config_apply_theme(&state, state.theme.c_str());
 
@@ -63,19 +62,25 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    // 6. setup signals (SIGUSR1, SIGUSR2, SIGHUP)
+    // 6. signals
     signals_init(&state);
 
     // 7. open camera
+    fprintf(stderr, "sehn: attempting to open %s\n", state.device.c_str());
     if (camera_open(&state) < 0) {
-        fprintf(stderr, "sehn: failed to open device %s\n",
-                state.device.c_str());
+        fprintf(stderr, "sehn: failed to open device %s\n", state.device.c_str());
         return 1;
     }
 
-    // 8. setup signals
-    signals_init(&state);
+    // 8. start streaming
+    if (camera_start(&state) < 0) {
+        camera_close(&state);
+        return 1;
+    }
 
-    printf("sehn: stubs ok\n");
+    printf("sehn: streaming from %s at %ux%u\n",
+           state.device.c_str(), state.width, state.height);
+
+    camera_close(&state);
     return 0;
 }
