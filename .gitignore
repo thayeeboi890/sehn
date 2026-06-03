@@ -1,4 +1,4 @@
-# .gitignore for sehn (C++ project using Meson)
+# .gitignore for sehn 
 
 # Meson build directory and generated files
 /build/
@@ -6,6 +6,9 @@
 /meson-logs/
 /meson-private/
 /build/meson-info/
+
+# cache and config CMakeFiles
+*.cache
 
 # Build system files
 build.ninja
@@ -61,7 +64,4 @@ Thumbs.db
 tags
 ctags
 
-# Node / environment
-node_modules/
-.env
 
