@@ -64,7 +64,7 @@ void capture_build_filename(AppState *state, char *buf, size_t buf_len,
     const char *p = time_part;
     char *out = with_counter;
     while (*p && out < with_counter + sizeof(with_counter) - 1) {
-        if (p[0] == '%' && p[1] == 'c') {
+        if (p[0] == '#' && p[1] == '#') {
             const char *c = counter_str;
             while (*c) *out++ = *c++;
             p += 2;

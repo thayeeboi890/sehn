@@ -51,7 +51,7 @@ AppState make_default_state() {
     s.pan_x             = 0;
     s.pan_y             = 0;
     s.output_dir        = ".";
-    s.filename_pattern  = "sehn_%Y%m%d_%H%M%S_%c";
+    s.filename_pattern = "sehn_%Y%m%d_%H%M%S_##";
     s.save_format       = "jpeg";
     s.jpeg_quality      = 92;
     s.png_compression   = 6;
