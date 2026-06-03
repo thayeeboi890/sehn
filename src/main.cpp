@@ -36,7 +36,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "list.h"
 #include "camera.h"
 #include "ui.h"
-
+#include "files.h"
 int main(int argc, char *argv[]) {
     // 1. start with defaults
     AppState state = make_default_state();
@@ -65,6 +65,11 @@ int main(int argc, char *argv[]) {
 
     // 6. signals
     signals_init(&state);
+    if (files_init_output_dir(&state) < 0) {
+        fprintf(stderr, "sehn: failed to create output dir: %s\n",
+                state.output_dir.c_str());
+        return 1;
+    }
 
     // 7. open camera
     fprintf(stderr, "sehn: attempting to open %s\n", state.device.c_str());

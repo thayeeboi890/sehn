@@ -22,3 +22,20 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 */
+
+#pragma once
+
+#include "sehn.h"
+#include <string>
+
+// Expand ~ and $HOME in a path.
+std::string files_expand_path(const std::string &path);
+
+// Ensure a directory exists, creating it recursively if needed.
+// Returns 0 on success, -1 on failure.
+int files_mkdir_p(const std::string &path);
+
+// Resolve state->output_dir — expand ~ and create the directory if needed.
+// Call once at startup after config is loaded.
+// Returns 0 on success, -1 on failure.
+int files_init_output_dir(AppState *state);
