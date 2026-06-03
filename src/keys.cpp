@@ -1,4 +1,4 @@
-/* keys.c
+/* keys.cpp
 
 Copyright (C) 2026 Santiago Silva.
 

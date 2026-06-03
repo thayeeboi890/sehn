@@ -1,4 +1,4 @@
-/* list.c
+/* list.cpp
 
 Copyright (C) 2026 Santiago Silva.
 

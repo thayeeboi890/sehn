@@ -1,4 +1,4 @@
-/* files.c
+/* files.cpp
 
 Copyright (C) 2026 Santiago Silva.
 

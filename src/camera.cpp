@@ -1,4 +1,4 @@
-/* camera.c
+/* camera.cpp
 
 Copyright (C) 2026 Santiago Silva.
 

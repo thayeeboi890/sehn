@@ -1,4 +1,4 @@
-/* toml.c
+/* toml.cpp
 
 Copyright (C) 2026 Santiago Silva.
 

@@ -1,4 +1,4 @@
-/* capture.c
+/* capture.cpp
 
 Copyright (C) 2026 Santiago Silva.
 
