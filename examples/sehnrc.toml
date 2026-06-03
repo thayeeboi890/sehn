@@ -1,0 +1,33 @@
+# TODO: add comments
+
+[camera]
+device      = "/dev/video0"
+format      = "mjpeg"
+resolution  = "1280x720"
+framerate   = 30
+autofocus   = true
+exposure    = "auto"
+wb          = "auto"
+wb_temp     = 5500
+gain        = 0
+
+[capture]
+output_dir      = "~/Pictures/sehn"
+filename        = "sehn_%Y%m%d_%H%M%S_##"
+save_format     = "jpeg"
+video_format    = "mkv"
+jpeg_quality    = 92
+png_compression = 6
+burst_count     = 10
+burst_interval  = 100
+
+[ui]
+mode          = "photo"
+fullscreen    = false
+borderless    = false
+panel         = true
+panel_width   = 64
+overlay       = false
+hide_pointer  = false
+window_width  = 960
+window_height = 540

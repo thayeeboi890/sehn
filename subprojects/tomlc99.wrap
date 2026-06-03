@@ -2,6 +2,7 @@
 url = https://github.com/cktan/tomlc99
 revision = master
 depth = 1
+patch_directory = tomlc99
 
 [provide]
 dependency_names = tomlc99
