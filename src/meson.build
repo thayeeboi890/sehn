@@ -6,6 +6,7 @@ sources = files(
   'cli.cpp',
   'signals.cpp',
   'list.cpp',
+  'camera.cpp',
 )
 
 executable('sehn',

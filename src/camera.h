@@ -22,3 +22,29 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 */
+
+#pragma once
+
+#include "sehn.h"
+#include <linux/videodev2.h>
+
+struct CameraBuffer {
+    void   *start;
+    size_t  length;
+};
+
+struct CameraState {
+    int              fd;
+    CameraBuffer    *buffers;
+    unsigned int     n_buffers;
+    struct v4l2_format fmt;
+    bool             streaming;
+};
+
+int         camera_open(AppState *state);
+int         camera_start(AppState *state);
+const void *camera_next_frame(AppState *state, size_t *out_size);
+void        camera_stop(AppState *state);
+void        camera_close(AppState *state);
+void        camera_apply_controls(AppState *state);
+int         camera_negotiate(AppState *state);

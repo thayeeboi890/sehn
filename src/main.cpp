@@ -34,6 +34,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "cli.h"
 #include "signals.h"
 #include "list.h"
+#include "camera.h"
 
 int main(int argc, char *argv[]) {
 
@@ -65,8 +66,15 @@ int main(int argc, char *argv[]) {
     // 6. setup signals (SIGUSR1, SIGUSR2, SIGHUP)
     signals_init(&state);
 
-    // 7. TODO: camera_open()  — Round 2
-    // 8. TODO: ui_run()       — Round 3
+    // 7. open camera
+    if (camera_open(&state) < 0) {
+        fprintf(stderr, "sehn: failed to open device %s\n",
+                state.device.c_str());
+        return 1;
+    }
+
+    // 8. setup signals
+    signals_init(&state);
 
     printf("sehn: stubs ok\n");
     return 0;
