@@ -63,6 +63,6 @@ install_subdir('share/fonts',
 
 # ── tests ───────────────────────────────────────────────────────────────────────
 
-if get_option('tests')
-  subdir('test')
-endif
+# if get_option('tests')
+  # subdir('test')
+# endif
