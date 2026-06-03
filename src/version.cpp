@@ -1,4 +1,4 @@
-/* version.c
+/* version.cpp
 
 Copyright (C) 2026 Santiago Silva.
 
