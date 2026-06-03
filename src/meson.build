@@ -11,6 +11,7 @@ sources = files(
   'panel.cpp',
   'overlay.cpp',
   'capture.cpp',
+  'cli.cpp',
 )
 
 executable('sehn',
