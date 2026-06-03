@@ -25,7 +25,48 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "overlay.h"
 #include <X11/Xlib.h>
+#include <cstdio>
+#include <ctime>
+#include <cstring>
+
+static const char *mode_str(Mode m) {
+    switch (m) {
+        case Mode::Photo:   return "PHOTO";
+        case Mode::Burst:   return "BURST";
+        case Mode::Video:   return "VIDEO";
+        case Mode::Preview: return "PREVIEW";
+        default:            return "???";
+    }
+}
+
 void overlay_draw(AppState *state, Display *dpy, Window win, GC gc) {
-    (void)state; (void)dpy; (void)win; (void)gc;
-    // TODO: draw mode, resolution, fps, timestamp
+    if (!state->overlay_visible) return;
+
+    // white text
+    XSetForeground(dpy, gc, 0xFFFFFF);
+
+    char buf[128];
+
+    // top-left: mode
+    snprintf(buf, sizeof(buf), "%s", mode_str(state->mode));
+    XDrawString(dpy, win, gc, 8, 16, buf, strlen(buf));
+
+    // top-left second line: resolution
+    snprintf(buf, sizeof(buf), "%ux%u @ %ufps",
+             state->width, state->height, state->framerate);
+    XDrawString(dpy, win, gc, 8, 32, buf, strlen(buf));
+
+    // top-left third line: recording indicator
+    if (state->recording) {
+        XSetForeground(dpy, gc, 0xFF0000); // red
+        snprintf(buf, sizeof(buf), "● REC");
+        XDrawString(dpy, win, gc, 8, 48, buf, strlen(buf));
+        XSetForeground(dpy, gc, 0xFFFFFF);
+    }
+
+    // bottom-left: timestamp
+    time_t now = time(nullptr);
+    struct tm *tm = localtime(&now);
+    strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", tm);
+    XDrawString(dpy, win, gc, 8, state->win_h - 8, buf, strlen(buf));
 }
