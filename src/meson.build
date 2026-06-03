@@ -7,6 +7,10 @@ sources = files(
   'signals.cpp',
   'list.cpp',
   'camera.cpp',
+  'ui.cpp',
+  'panel.cpp',
+  'overlay.cpp',
+  'capture.cpp',
 )
 
 executable('sehn',

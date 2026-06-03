@@ -35,6 +35,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "signals.h"
 #include "list.h"
 #include "camera.h"
+#include "ui.h"
 
 int main(int argc, char *argv[]) {
     // 1. start with defaults
@@ -81,6 +82,8 @@ int main(int argc, char *argv[]) {
     printf("sehn: streaming from %s at %ux%u\n",
            state.device.c_str(), state.width, state.height);
 
+    // 9. run ui
+    int ret = ui_run(&state);
     camera_close(&state);
-    return 0;
+    return ret;
 }

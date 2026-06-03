@@ -10,6 +10,7 @@ project('sehn', 'cpp',
 # ── dependencies ────────────────────────────────────────────────────────────────
 
 x11_dep      = dependency('x11')
+xext_dep     = dependency('xext')
 libjpeg_dep  = dependency('libjpeg')
 libpng_dep   = dependency('libpng')
 libexif_dep  = dependency('libexif',  required : false)
@@ -18,7 +19,7 @@ v4l2_dep     = dependency('libv4l2',  required : true)
 toml_dep     = dependency('tomlc99',  required : false,
                  fallback : ['tomlc99', 'tomlc99_dep'])
 
-deps = [x11_dep, libjpeg_dep, libpng_dep, v4l2_dep, toml_dep]
+deps = [x11_dep, xext_dep, libjpeg_dep, libpng_dep, v4l2_dep, toml_dep]
 
 if libexif_dep.found()
   deps += libexif_dep

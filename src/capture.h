@@ -22,3 +22,31 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 */
+
+#pragma once
+
+#include "sehn.h"
+#include <cstddef>
+
+// Save the current frame as a still image (JPEG or PNG based on state).
+// Returns 0 on success, -1 on failure.
+int capture_photo(AppState *state, const void *frame, size_t frame_size);
+
+// Start a video recording session.
+// Returns 0 on success, -1 on failure.
+int capture_video_start(AppState *state);
+
+// Write a frame to the current video recording.
+void capture_video_frame(AppState *state, const void *frame, size_t frame_size);
+
+// Stop and finalize the current video recording.
+void capture_video_stop(AppState *state);
+
+// Capture burst_count frames at burst_interval_ms apart and save each one.
+// Blocks until all frames are captured.
+void capture_burst(AppState *state);
+
+// Build the output filename from state->filename_pattern and state->output_dir.
+// Writes into buf up to buf_len bytes.
+void capture_build_filename(AppState *state, char *buf, size_t buf_len,
+                             const char *ext);
