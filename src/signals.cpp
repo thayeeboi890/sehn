@@ -24,23 +24,23 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 #include "signals.h"
+#include "capture.h"
+#include "camera.h"
 #include <csignal>
 #include <cstdio>
 
-// Module-level pointer so the C signal handlers can reach state.
-// Only one AppState ever exists, so this is fine.
 static AppState *g_state = nullptr;
 
 static void handle_sigusr1(int) {
-    // TODO: set a flag on g_state to trigger capture / next frame
+    if (g_state) g_state->sig_capture = true;
 }
 
 static void handle_sigusr2(int) {
-    // TODO: set a flag on g_state to cycle mode
+    if (g_state) g_state->sig_next_mode = true;
 }
 
 static void handle_sighup(int) {
-    // TODO: set a flag on g_state to reload config
+    if (g_state) g_state->sig_reload_config = true;
 }
 
 void signals_init(AppState *state) {
@@ -51,6 +51,22 @@ void signals_init(AppState *state) {
 }
 
 void signals_dispatch(AppState *state) {
-    (void)state;
-    // TODO: check flags set by handlers and call the right functions
+    if (state->sig_capture) {
+        state->sig_capture = false;
+        size_t fsz = 0;
+        const void *f = camera_next_frame(state, &fsz);
+        if (f) capture_photo(state, f, fsz);
+    }
+
+    if (state->sig_next_mode) {
+        state->sig_next_mode = false;
+        state->mode = (Mode)(((int)state->mode + 1) % 4);
+        printf("sehn: mode -> %d\n", (int)state->mode);
+    }
+
+    if (state->sig_reload_config) {
+        state->sig_reload_config = false;
+        // TODO: call config_load once config.h is fully wired
+        printf("sehn: SIGHUP received, config reload not yet implemented\n");
+    }
 }

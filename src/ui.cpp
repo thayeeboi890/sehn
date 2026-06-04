@@ -29,6 +29,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "overlay.h"
 #include "capture.h"
 #include "input.h"
+#include "signals.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -294,7 +295,7 @@ int ui_run(AppState *state) {
     state->running  = true;
 
     while (state->running) {
-        // drain X events
+        signals_dispatch(state);
         while (XPending(ui.dpy)) {
             XEvent ev;
             XNextEvent(ui.dpy, &ev);
