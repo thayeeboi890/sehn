@@ -28,6 +28,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "panel.h"
 #include "overlay.h"
 #include "capture.h"
+#include "input.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -217,6 +218,8 @@ static void handle_key(AppState *state, XKeyEvent *ev) {
 // ── main loop ────────────────────────────────────────────────────────────────
 
 int ui_run(AppState *state) {
+
+    KeyMap km = keys_load(state);
     ui.dpy = XOpenDisplay(nullptr);
     if (!ui.dpy) {
         fprintf(stderr, "sehn: cannot open display\n");
@@ -296,35 +299,12 @@ int ui_run(AppState *state) {
             XEvent ev;
             XNextEvent(ui.dpy, &ev);
             if (ev.type == KeyPress)
-                handle_key(state, &ev.xkey);
+                input_handle_key(state, km, &ev.xkey);
             else if (ev.type == ClientMessage) {
                 if ((Atom)ev.xclient.data.l[0] == wm_delete)
                     state->running = false;
             } else if (ev.type == ButtonPress) {
-                int hit = panel_hittest(state, ev.xbutton.x, ev.xbutton.y);
-                switch (hit) {
-                    case PANEL_SHUTTER: {
-                        size_t fsz = 0;
-                        const void *f = camera_next_frame(state, &fsz);
-                        if (f) {
-                            if (state->mode == Mode::Burst)
-                                capture_burst(state);
-                            else if (state->mode == Mode::Video) {
-                                if (!state->recording) { capture_video_start(state); state->recording = true; }
-                                else                   { capture_video_stop(state);  state->recording = false; }
-                            } else {
-                                capture_photo(state, f, fsz);
-                            }
-                        }
-                        break;
-                    }
-                    case PANEL_MODE:
-                        state->mode = (Mode)(((int)state->mode + 1) % 4);
-                        break;
-                    case PANEL_MENU:
-                        // TODO: open menu
-                        break;
-                }
+                input_handle_button(state, &ev.xbutton);
             } else if (ev.type == ConfigureNotify) {
                 state->win_w = ev.xconfigure.width  - state->panel_width;
                 state->win_h = ev.xconfigure.height;

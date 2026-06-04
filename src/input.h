@@ -22,3 +22,15 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 */
+
+#pragma once
+
+#include "sehn.h"
+#include "keys.h"
+#include <X11/Xlib.h>
+
+// Dispatch a key event through the keymap to the right action.
+void input_handle_key(AppState *state, const KeyMap &km, XKeyEvent *ev);
+
+// Dispatch a button click.
+void input_handle_button(AppState *state, XButtonEvent *ev);

@@ -13,6 +13,8 @@ sources = files(
   'capture.cpp',
   'cli.cpp',
   'files.cpp',
+  'keys.cpp',
+  'input.cpp',
 )
 
 executable('sehn',
