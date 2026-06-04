@@ -25,6 +25,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "capture.h"
 #include "camera.h"
+#include "exif.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -111,7 +112,9 @@ static int save_jpeg(AppState *state, const uint8_t *rgb,
     jpeg_finish_compress(&cinfo);
     jpeg_destroy_compress(&cinfo);
     fclose(fp);
-
+    #ifdef HAVE_LIBEXIF
+      exif_write(state, path);
+    #endif
     printf("sehn: saved %s\n", path);
     return 0;
 }
@@ -131,6 +134,9 @@ static int save_png(AppState *state, const uint8_t *rgb,
     png_infop info  = png_create_info_struct(png);
     if (setjmp(png_jmpbuf(png))) {
         fclose(fp);
+        #ifdef HAVE_LIBEXIF
+          exif_write(state, path);
+        #endif
         return -1;
     }
 
