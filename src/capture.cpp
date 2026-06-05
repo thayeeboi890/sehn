@@ -42,6 +42,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #ifdef HAVE_LIBEXIF
 #include <libexif/exif-data.h>
+#include "utils.h"
 #endif
 
 // session capture counter, resets each run
@@ -244,7 +245,7 @@ void capture_burst(AppState *state) {
         size_t frame_size = 0;
         const void *frame = camera_next_frame(state, &frame_size);
         if (!frame) {
-            fprintf(stderr, "sehn: burst frame %d failed\n", i);
+            LOG_DEBUG("burst frame %d failed", i);
             continue;
         }
         capture_photo(state, frame, frame_size);

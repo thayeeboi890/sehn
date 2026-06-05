@@ -33,6 +33,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <dirent.h>
 #include <sys/ioctl.h>
 #include <linux/videodev2.h>
+#include "utils.h"
 
 static int xioctl(int fd, unsigned long request, void *arg) {
     int r;
@@ -44,7 +45,7 @@ static int xioctl(int fd, unsigned long request, void *arg) {
 int list_devices() {
     DIR *d = opendir("/sys/class/video4linux");
     if (!d) {
-        fprintf(stderr, "sehn: cannot open /sys/class/video4linux\n");
+        LOG_DEBUG("cannot open /sys/class/video4linux");
         return 1;
     }
 
@@ -84,7 +85,7 @@ int list_devices() {
 int list_formats(const char *device) {
     int fd = open(device, O_RDWR | O_NONBLOCK);
     if (fd < 0) {
-        fprintf(stderr, "sehn: cannot open %s\n", device);
+        LOG_DEBUG("cannot open %s", device);
         return 1;
     }
 
@@ -144,7 +145,7 @@ int list_formats(const char *device) {
 int list_controls(const char *device) {
     int fd = open(device, O_RDWR | O_NONBLOCK);
     if (fd < 0) {
-        fprintf(stderr, "sehn: cannot open %s\n", device);
+        LOG_DEBUG("cannot open %s", device);
         return 1;
     }
 

@@ -88,6 +88,7 @@ static void yuyv_to_rgb(const uint8_t *yuyv, uint8_t *rgb,
 
 // MJPEG: libjpeg decompresses directly into rgb_buf
 #include <jpeglib.h>
+#include "utils.h"
 static bool mjpeg_to_rgb(const uint8_t *data, size_t len,
                           uint8_t *rgb, uint32_t /*width*/, uint32_t height) {
     struct jpeg_decompress_struct cinfo;
@@ -223,7 +224,7 @@ int ui_run(AppState *state) {
     KeyMap km = keys_load(state);
     ui.dpy = XOpenDisplay(nullptr);
     if (!ui.dpy) {
-        fprintf(stderr, "sehn: cannot open display\n");
+        LOG_DEBUG("cannot open display");
         return 1;
     }
 
@@ -277,7 +278,7 @@ int ui_run(AppState *state) {
     // try XShm, fall back to XPutImage
     ui.shm_available = shm_init(state);
     if (!ui.shm_available) {
-        fprintf(stderr, "sehn: XShm unavailable, falling back to XPutImage\n");
+        LOG_DEBUG("XShm unavailable, falling back to XPutImage");
         int screen   = DefaultScreen(ui.dpy);
         Visual *vis  = DefaultVisual(ui.dpy, screen);
         int depth    = DefaultDepth(ui.dpy, screen);

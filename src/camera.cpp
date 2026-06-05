@@ -33,6 +33,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <linux/videodev2.h>
+#include "utils.h"
 
 // one CameraState per app, lives here
 static CameraState cam = {};
@@ -76,8 +77,7 @@ int camera_negotiate(AppState *state) {
     xioctl(cam.fd, VIDIOC_S_PARM, &parm); // non-fatal if unsupported
 
     if (state->verbose)
-        fprintf(stderr, "sehn: negotiated %ux%u @ %u fps\n",
-                state->width, state->height, state->framerate);
+        LOG_DEBUG("negotiated %ux%u @ %u fps", state->width, state->height, state->framerate);
 
     return 0;
 }
@@ -98,14 +98,12 @@ int camera_open(AppState *state) {
         return -1;
     }
     if (!(cap.capabilities & V4L2_CAP_VIDEO_CAPTURE)) {
-        fprintf(stderr, "sehn: %s is not a capture device\n",
-                state->device.c_str());
+        LOG_DEBUG("%s is not a capture device", state->device.c_str());
         close(cam.fd);
         return -1;
     }
     if (!(cap.capabilities & V4L2_CAP_STREAMING)) {
-        fprintf(stderr, "sehn: %s does not support streaming\n",
-                state->device.c_str());
+        LOG_DEBUG("%s does not support streaming", state->device.c_str());
         close(cam.fd);
         return -1;
     }
@@ -190,7 +188,7 @@ const void *camera_next_frame(AppState *state, size_t *out_size) {
 
     int r = select(cam.fd + 1, &fds, nullptr, nullptr, &tv);
     if (r <= 0) {
-        if (r == 0) fprintf(stderr, "sehn: frame timeout\n");
+        if (r == 0) LOG_DEBUG("frame timeout");
         else        perror("select");
         return nullptr;
     }

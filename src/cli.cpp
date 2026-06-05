@@ -29,6 +29,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <cstdlib>
 #include <cstring>
 #include <getopt.h>
+#include "utils.h"
 
 static void print_usage() {
     printf(
@@ -139,7 +140,7 @@ int cli_parse(int argc, char *argv[], AppState *state) {
                     state->width  = w;
                     state->height = h;
                 } else {
-                    fprintf(stderr, "sehn: invalid resolution '%s', expected WxH\n", optarg);
+                    LOG_DEBUG("invalid resolution '%s', expected WxH", optarg);
                     return 1;
                 }
                 break;
@@ -151,7 +152,7 @@ int cli_parse(int argc, char *argv[], AppState *state) {
                 else if (strcmp(optarg, "video")   == 0) state->mode = Mode::Video;
                 else if (strcmp(optarg, "preview") == 0) state->mode = Mode::Preview;
                 else {
-                    fprintf(stderr, "sehn: unknown mode '%s'\n", optarg);
+                    LOG_DEBUG("unknown mode '%s'", optarg);
                     return 1;
                 }
                 break;
@@ -166,7 +167,7 @@ int cli_parse(int argc, char *argv[], AppState *state) {
                     state->win_w = w;
                     state->win_h = h;
                 } else {
-                    fprintf(stderr, "sehn: invalid geometry '%s', expected WxH\n", optarg);
+                    LOG_DEBUG("invalid geometry '%s', expected WxH", optarg);
                     return 1;
                 }
                 break;
@@ -194,7 +195,7 @@ int cli_parse(int argc, char *argv[], AppState *state) {
             case OPT_PRINT_CONFIG:    state->print_config_and_exit  = true; break;
 
             default:
-                fprintf(stderr, "sehn: unknown option, try --help\n");
+                LOG_DEBUG("unknown option, try --help");
                 return 1;
         }
     }

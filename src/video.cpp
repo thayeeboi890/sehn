@@ -38,6 +38,7 @@ extern "C" {
 #include <libavutil/opt.h>
 #include <libavutil/imgutils.h>
 #include <libswscale/swscale.h>
+#include "utils.h"
 }
 
 struct VideoState {
@@ -80,21 +81,21 @@ int video_open(AppState *state, const char *path) {
     ret = avformat_alloc_output_context2(&vid.fmt_ctx, nullptr,
                                           nullptr, path);
     if (ret < 0 || !vid.fmt_ctx) {
-        fprintf(stderr, "sehn: video: could not allocate format context\n");
+        LOG_DEBUG("video: could not allocate format context");
         return -1;
     }
 
     // find H264 encoder
     const AVCodec *codec = avcodec_find_encoder(AV_CODEC_ID_H264);
     if (!codec) {
-        fprintf(stderr, "sehn: video: H264 encoder not found\n");
+        LOG_DEBUG("video: H264 encoder not found");
         return -1;
     }
 
     // create stream
     vid.stream = avformat_new_stream(vid.fmt_ctx, nullptr);
     if (!vid.stream) {
-        fprintf(stderr, "sehn: video: could not create stream\n");
+        LOG_DEBUG("video: could not create stream");
         return -1;
     }
 
@@ -121,7 +122,7 @@ int video_open(AppState *state, const char *path) {
     // open codec
     ret = avcodec_open2(vid.codec_ctx, codec, nullptr);
     if (ret < 0) {
-        fprintf(stderr, "sehn: video: could not open codec\n");
+        LOG_DEBUG("video: could not open codec");
         return -1;
     }
 
@@ -133,7 +134,7 @@ int video_open(AppState *state, const char *path) {
     if (!(vid.fmt_ctx->oformat->flags & AVFMT_NOFILE)) {
         ret = avio_open(&vid.fmt_ctx->pb, path, AVIO_FLAG_WRITE);
         if (ret < 0) {
-            fprintf(stderr, "sehn: video: could not open output file\n");
+            LOG_DEBUG("video: could not open output file");
             return -1;
         }
     }
@@ -141,7 +142,7 @@ int video_open(AppState *state, const char *path) {
     // write header
     ret = avformat_write_header(vid.fmt_ctx, nullptr);
     if (ret < 0) {
-        fprintf(stderr, "sehn: video: could not write header\n");
+        LOG_DEBUG("video: could not write header");
         return -1;
     }
 

@@ -30,6 +30,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 extern "C" {
 #include "../subprojects/tomlc99/toml.h"
+#include "utils.h"
 }
 
 static std::string default_keys_path() {
@@ -135,7 +136,7 @@ KeyMap keys_load(AppState *state) {
     toml_table_t *root = toml_parse_file(fp, errbuf, sizeof(errbuf));
     fclose(fp);
     if (!root) {
-        fprintf(stderr, "sehn: keys.toml parse error: %s\n", errbuf);
+        LOG_DEBUG("keys.toml parse error: %s", errbuf);
         return km;
     }
 
@@ -149,8 +150,7 @@ KeyMap keys_load(AppState *state) {
 
         Action action = action_from_str(action_name);
         if (action == Action::Unknown) {
-            fprintf(stderr, "sehn: unknown action '%s' in keys.toml\n",
-                    action_name);
+            LOG_DEBUG("unknown action '%s' in keys.toml", action_name);
             continue;
         }
 
@@ -170,7 +170,7 @@ KeyMap keys_load(AppState *state) {
             KeySym sym = XStringToKeysym(d.u.s);
             free(d.u.s);
             if (sym == NoSymbol) {
-                fprintf(stderr, "sehn: unknown keysym in keys.toml\n");
+                LOG_DEBUG("unknown keysym in keys.toml");
                 continue;
             }
             km[sym] = action;

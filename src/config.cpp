@@ -31,6 +31,7 @@ extern "C" {
 #include <cstdlib>
 #include <cstring>
 #include <sys/stat.h>
+#include "utils.h"
 
 // resolve ~/.config/sehn/sehnrc.toml via XDG
 static std::string default_config_path() {
@@ -79,7 +80,7 @@ int config_load(AppState *state, const char *path) {
     fclose(fp);
 
     if (!root) {
-        fprintf(stderr, "sehn: config parse error: %s\n", errbuf);
+        LOG_DEBUG("config parse error: %s", errbuf);
         return -2;
     }
 
@@ -159,7 +160,7 @@ int config_apply_theme(AppState *state, const char *theme_name) {
 
     toml_table_t *theme = toml_table_in(root, theme_name);
     if (!theme) {
-        fprintf(stderr, "sehn: theme '%s' not found\n", theme_name);
+        LOG_DEBUG("theme '%s' not found", theme_name);
         toml_free(root);
         return -1;
     }

@@ -69,15 +69,14 @@ int main(int argc, char *argv[]) {
     // 6. signals
     signals_init(&state);
     if (files_init_output_dir(&state) < 0) {
-        fprintf(stderr, "sehn: failed to create output dir: %s\n",
-                state.output_dir.c_str());
+        LOG_DEBUG("failed to create output dir: %s", state.output_dir.c_str());
         return 1;
     }
 
     // 7. open camera
-    fprintf(stderr, "sehn: attempting to open %s\n", state.device.c_str());
+    LOG_DEBUG("attempting to open %s", state.device.c_str());
     if (camera_open(&state) < 0) {
-        fprintf(stderr, "sehn: failed to open device %s\n", state.device.c_str());
+        LOG_DEBUG("failed to open device %s", state.device.c_str());
         return 1;
     }
 
