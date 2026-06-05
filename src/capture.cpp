@@ -27,6 +27,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "camera.h"
 #include "exif.h"
 #include "video.h"
+#include "utils.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -117,7 +118,7 @@ static int save_jpeg(AppState *state, const uint8_t *rgb,
     #ifdef HAVE_LIBEXIF
       exif_write(state, path);
     #endif
-    printf("sehn: saved %s\n", path);
+    LOG_INFO("saved %s", path);
     return 0;
 }
 
@@ -158,7 +159,7 @@ static int save_png(AppState *state, const uint8_t *rgb,
     png_destroy_write_struct(&png, &info);
     fclose(fp);
 
-    printf("sehn: saved %s\n", path);
+    LOG_INFO("saved %s", path);
     return 0;
 }
 
@@ -238,21 +239,21 @@ int capture_photo(AppState *state, const void *frame, size_t frame_size) {
 }
 
 void capture_burst(AppState *state) {
-    printf("sehn: burst start (%d frames, %dms interval)\n",
+    LOG_INFO("burst start (%d frames, %dms interval)",
            state->burst_count, state->burst_interval_ms);
 
     for (int i = 0; i < state->burst_count; i++) {
         size_t frame_size = 0;
         const void *frame = camera_next_frame(state, &frame_size);
         if (!frame) {
-            LOG_DEBUG("burst frame %d failed", i);
+            LOG_WARN("burst frame %d failed", i);
             continue;
         }
         capture_photo(state, frame, frame_size);
         usleep((useconds_t)state->burst_interval_ms * 1000);
     }
 
-    printf("sehn: burst done\n");
+    LOG_INFO("burst done");
 }
 
 int capture_video_start(AppState *state) {

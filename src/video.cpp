@@ -75,27 +75,28 @@ static void yuyv_to_yuv420(const uint8_t *yuyv, AVFrame *frame,
 }
 
 int video_open(AppState *state, const char *path) {
+    LOG_DEBUG("video: opening output %s", path);
     int ret;
 
     // allocate output context
     ret = avformat_alloc_output_context2(&vid.fmt_ctx, nullptr,
                                           nullptr, path);
     if (ret < 0 || !vid.fmt_ctx) {
-        LOG_DEBUG("video: could not allocate format context");
+        LOG_ERROR("video: could not allocate format context");
         return -1;
     }
 
     // find H264 encoder
     const AVCodec *codec = avcodec_find_encoder(AV_CODEC_ID_H264);
     if (!codec) {
-        LOG_DEBUG("video: H264 encoder not found");
+        LOG_ERROR("video: H264 encoder not found");
         return -1;
     }
 
     // create stream
     vid.stream = avformat_new_stream(vid.fmt_ctx, nullptr);
     if (!vid.stream) {
-        LOG_DEBUG("video: could not create stream");
+        LOG_ERROR("video: could not create stream");
         return -1;
     }
 
@@ -122,7 +123,7 @@ int video_open(AppState *state, const char *path) {
     // open codec
     ret = avcodec_open2(vid.codec_ctx, codec, nullptr);
     if (ret < 0) {
-        LOG_DEBUG("video: could not open codec");
+        LOG_ERROR("video: could not open codec");
         return -1;
     }
 
@@ -134,7 +135,7 @@ int video_open(AppState *state, const char *path) {
     if (!(vid.fmt_ctx->oformat->flags & AVFMT_NOFILE)) {
         ret = avio_open(&vid.fmt_ctx->pb, path, AVIO_FLAG_WRITE);
         if (ret < 0) {
-            LOG_DEBUG("video: could not open output file");
+            LOG_ERROR("video: could not open output file");
             return -1;
         }
     }
@@ -142,7 +143,7 @@ int video_open(AppState *state, const char *path) {
     // write header
     ret = avformat_write_header(vid.fmt_ctx, nullptr);
     if (ret < 0) {
-        LOG_DEBUG("video: could not write header");
+        LOG_ERROR("video: could not write header");
         return -1;
     }
 
@@ -164,7 +165,7 @@ int video_open(AppState *state, const char *path) {
 
     vid.pts  = 0;
     vid.open = true;
-    printf("sehn: recording to %s\n", path);
+    LOG_INFO("recording to %s", path);
     return 0;
 }
 
@@ -241,5 +242,5 @@ void video_close(AppState *state) {
         avio_closep(&vid.fmt_ctx->pb);
     avformat_free_context(vid.fmt_ctx);
     vid = {};
-    printf("sehn: recording stopped\n");
+    LOG_INFO("recording stopped");
 }

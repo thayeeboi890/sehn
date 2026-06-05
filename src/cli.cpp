@@ -140,7 +140,7 @@ int cli_parse(int argc, char *argv[], AppState *state) {
                     state->width  = w;
                     state->height = h;
                 } else {
-                    LOG_DEBUG("invalid resolution '%s', expected WxH", optarg);
+                    LOG_ERROR("invalid resolution '%s', expected WxH", optarg);
                     return 1;
                 }
                 break;
@@ -152,7 +152,7 @@ int cli_parse(int argc, char *argv[], AppState *state) {
                 else if (strcmp(optarg, "video")   == 0) state->mode = Mode::Video;
                 else if (strcmp(optarg, "preview") == 0) state->mode = Mode::Preview;
                 else {
-                    LOG_DEBUG("unknown mode '%s'", optarg);
+                    LOG_ERROR("unknown mode '%s'", optarg);
                     return 1;
                 }
                 break;
@@ -167,7 +167,7 @@ int cli_parse(int argc, char *argv[], AppState *state) {
                     state->win_w = w;
                     state->win_h = h;
                 } else {
-                    LOG_DEBUG("invalid geometry '%s', expected WxH", optarg);
+                    LOG_ERROR("invalid geometry '%s', expected WxH", optarg);
                     return 1;
                 }
                 break;
@@ -195,7 +195,7 @@ int cli_parse(int argc, char *argv[], AppState *state) {
             case OPT_PRINT_CONFIG:    state->print_config_and_exit  = true; break;
 
             default:
-                LOG_DEBUG("unknown option, try --help");
+                LOG_ERROR("unknown option, try --help");
                 return 1;
         }
     }

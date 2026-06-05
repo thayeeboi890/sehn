@@ -224,9 +224,10 @@ int ui_run(AppState *state) {
     KeyMap km = keys_load(state);
     ui.dpy = XOpenDisplay(nullptr);
     if (!ui.dpy) {
-        LOG_DEBUG("cannot open display");
+        LOG_ERROR("cannot open display");
         return 1;
     }
+    LOG_DEBUG("opened X display");
 
     ui.screen = DefaultScreen(ui.dpy);
     int win_w  = state->win_w + (state->panel_visible ? state->panel_width : 0);

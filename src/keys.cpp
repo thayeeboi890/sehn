@@ -136,7 +136,7 @@ KeyMap keys_load(AppState *state) {
     toml_table_t *root = toml_parse_file(fp, errbuf, sizeof(errbuf));
     fclose(fp);
     if (!root) {
-        LOG_DEBUG("keys.toml parse error: %s", errbuf);
+        LOG_ERROR("keys.toml parse error: %s", errbuf);
         return km;
     }
 
@@ -150,7 +150,7 @@ KeyMap keys_load(AppState *state) {
 
         Action action = action_from_str(action_name);
         if (action == Action::Unknown) {
-            LOG_DEBUG("unknown action '%s' in keys.toml", action_name);
+            LOG_WARN("unknown action '%s' in keys.toml", action_name);
             continue;
         }
 
@@ -170,7 +170,7 @@ KeyMap keys_load(AppState *state) {
             KeySym sym = XStringToKeysym(d.u.s);
             free(d.u.s);
             if (sym == NoSymbol) {
-                LOG_DEBUG("unknown keysym in keys.toml");
+                LOG_WARN("unknown keysym in keys.toml");
                 continue;
             }
             km[sym] = action;

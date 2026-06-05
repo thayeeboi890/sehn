@@ -50,3 +50,10 @@ void sehn_log(LogLevel level, const char *fmt, ...);
 #define LOG_WARN(...)  sehn_log(LogLevel::Warn,  __VA_ARGS__)
 #define LOG_ERROR(...) sehn_log(LogLevel::Error, __VA_ARGS__)
 #define LOG_DEBUG(...) sehn_log(LogLevel::Debug, __VA_ARGS__)
+
+// Helper to log function entry/exit for debug
+#if defined(__GNUC__)
+#define LOG_FN() LOG_DEBUG("%s:%d %s", __FILE__, __LINE__, __func__)
+#else
+#define LOG_FN() LOG_DEBUG("%s %s", __FILE__, __func__)
+#endif

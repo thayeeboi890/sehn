@@ -45,7 +45,7 @@ static int xioctl(int fd, unsigned long request, void *arg) {
 int list_devices() {
     DIR *d = opendir("/sys/class/video4linux");
     if (!d) {
-        LOG_DEBUG("cannot open /sys/class/video4linux");
+        LOG_ERROR("cannot open /sys/class/video4linux");
         return 1;
     }
 
@@ -85,7 +85,7 @@ int list_devices() {
 int list_formats(const char *device) {
     int fd = open(device, O_RDWR | O_NONBLOCK);
     if (fd < 0) {
-        LOG_DEBUG("cannot open %s", device);
+        LOG_ERROR("cannot open %s", device);
         return 1;
     }
 
@@ -145,7 +145,7 @@ int list_formats(const char *device) {
 int list_controls(const char *device) {
     int fd = open(device, O_RDWR | O_NONBLOCK);
     if (fd < 0) {
-        LOG_DEBUG("cannot open %s", device);
+        LOG_ERROR("cannot open %s", device);
         return 1;
     }
 

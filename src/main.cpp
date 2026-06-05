@@ -69,14 +69,14 @@ int main(int argc, char *argv[]) {
     // 6. signals
     signals_init(&state);
     if (files_init_output_dir(&state) < 0) {
-        LOG_DEBUG("failed to create output dir: %s", state.output_dir.c_str());
+        LOG_ERROR("failed to create output dir: %s", state.output_dir.c_str());
         return 1;
     }
 
     // 7. open camera
-    LOG_DEBUG("attempting to open %s", state.device.c_str());
+    LOG_INFO("attempting to open %s", state.device.c_str());
     if (camera_open(&state) < 0) {
-        LOG_DEBUG("failed to open device %s", state.device.c_str());
+        LOG_ERROR("failed to open device %s", state.device.c_str());
         return 1;
     }
 

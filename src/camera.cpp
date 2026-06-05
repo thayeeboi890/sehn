@@ -83,6 +83,7 @@ int camera_negotiate(AppState *state) {
 }
 
 int camera_open(AppState *state) {
+    LOG_DEBUG("opening camera device %s", state->device.c_str());
     // open device
     cam.fd = open(state->device.c_str(), O_RDWR | O_NONBLOCK);
     if (cam.fd < 0) {
@@ -98,12 +99,12 @@ int camera_open(AppState *state) {
         return -1;
     }
     if (!(cap.capabilities & V4L2_CAP_VIDEO_CAPTURE)) {
-        LOG_DEBUG("%s is not a capture device", state->device.c_str());
+        LOG_ERROR("%s is not a capture device", state->device.c_str());
         close(cam.fd);
         return -1;
     }
     if (!(cap.capabilities & V4L2_CAP_STREAMING)) {
-        LOG_DEBUG("%s does not support streaming", state->device.c_str());
+        LOG_ERROR("%s does not support streaming", state->device.c_str());
         close(cam.fd);
         return -1;
     }
@@ -188,7 +189,7 @@ const void *camera_next_frame(AppState *state, size_t *out_size) {
 
     int r = select(cam.fd + 1, &fds, nullptr, nullptr, &tv);
     if (r <= 0) {
-        if (r == 0) LOG_DEBUG("frame timeout");
+        if (r == 0) LOG_WARN("frame timeout");
         else        perror("select");
         return nullptr;
     }

@@ -80,7 +80,7 @@ int config_load(AppState *state, const char *path) {
     fclose(fp);
 
     if (!root) {
-        LOG_DEBUG("config parse error: %s", errbuf);
+        LOG_ERROR("config parse error: %s", errbuf);
         return -2;
     }
 
@@ -160,7 +160,7 @@ int config_apply_theme(AppState *state, const char *theme_name) {
 
     toml_table_t *theme = toml_table_in(root, theme_name);
     if (!theme) {
-        LOG_DEBUG("theme '%s' not found", theme_name);
+        LOG_WARN("theme '%s' not found", theme_name);
         toml_free(root);
         return -1;
     }
