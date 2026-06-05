@@ -39,7 +39,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "files.h"
 #include "utils.h"
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[]) { LOG_FN();
     // 1. start with defaults
     AppState state = make_default_state();
 

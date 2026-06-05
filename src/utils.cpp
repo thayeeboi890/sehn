@@ -26,9 +26,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "utils.h"
 #include <cstdio>
 #include <cstdarg>
+#include <ctime>
+#include <mutex>
 
 static bool g_verbose = false;
 static bool g_quiet   = false;
+static std::mutex g_log_mutex;
 
 void log_init(AppState *state) {
     g_verbose = state->verbose;
@@ -44,7 +47,22 @@ void sehn_log(LogLevel level, const char *fmt, ...) {
     FILE *out = (level == LogLevel::Error ||
                  level == LogLevel::Warn) ? stderr : stdout;
 
+    // timestamp
+    time_t t = time(nullptr);
+    struct tm tm_buf;
+#if defined(_POSIX_THREAD_SAFE_FUNCTIONS)
+    localtime_r(&t, &tm_buf);
+#else
+    struct tm *tmp = localtime(&t);
+    if (tmp) tm_buf = *tmp;
+#endif
+    char ts[64];
+    strftime(ts, sizeof(ts), "%F %T", &tm_buf);
+
+    std::lock_guard<std::mutex> lock(g_log_mutex);
+
     // prefix
+    fprintf(out, "%s ", ts);
     switch (level) {
         case LogLevel::Warn:  fprintf(out, "sehn: warning: "); break;
         case LogLevel::Error: fprintf(out, "sehn: error: ");   break;

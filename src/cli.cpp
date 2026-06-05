@@ -125,7 +125,7 @@ static const struct option long_opts[] = {
     { nullptr, 0, nullptr, 0 }
 };
 
-int cli_parse(int argc, char *argv[], AppState *state) {
+int cli_parse(int argc, char *argv[], AppState *state) { LOG_FN();
     int opt;
     while ((opt = getopt_long(argc, argv,
                               "d:o:f:r:R:m:FxT:c:g:qVvh",

@@ -52,7 +52,7 @@ static int session_counter = 0;
 // ── filename builder ──────────────────────────────────────────────────────────
 
 void capture_build_filename(AppState *state, char *buf, size_t buf_len,
-                             const char *ext) {
+                             const char *ext) { LOG_FN();
     // expand strftime tokens first
     time_t now = time(nullptr);
     struct tm *tm = localtime(&now);
@@ -85,7 +85,7 @@ void capture_build_filename(AppState *state, char *buf, size_t buf_len,
 // ── JPEG save ────────────────────────────────────────────────────────────────
 
 static int save_jpeg(AppState *state, const uint8_t *rgb,
-                     uint32_t width, uint32_t height) {
+                     uint32_t width, uint32_t height) { LOG_FN();
     char path[1024];
     capture_build_filename(state, path, sizeof(path), "jpg");
 
@@ -125,7 +125,7 @@ static int save_jpeg(AppState *state, const uint8_t *rgb,
 // ── PNG save ─────────────────────────────────────────────────────────────────
 
 static int save_png(AppState *state, const uint8_t *rgb,
-                    uint32_t width, uint32_t height) {
+                    uint32_t width, uint32_t height) { LOG_FN();
     char path[1024];
     capture_build_filename(state, path, sizeof(path), "png");
 
@@ -220,7 +220,7 @@ static uint8_t *yuyv_decode(const void *data,
 
 // ── public api ────────────────────────────────────────────────────────────────
 
-int capture_photo(AppState *state, const void *frame, size_t frame_size) {
+int capture_photo(AppState *state, const void *frame, size_t frame_size) { LOG_FN();
     uint8_t *rgb;
 
     if (state->v4l2_format == "mjpeg")
@@ -238,7 +238,7 @@ int capture_photo(AppState *state, const void *frame, size_t frame_size) {
     return ret;
 }
 
-void capture_burst(AppState *state) {
+void capture_burst(AppState *state) { LOG_FN();
     LOG_INFO("burst start (%d frames, %dms interval)",
            state->burst_count, state->burst_interval_ms);
 
@@ -256,7 +256,7 @@ void capture_burst(AppState *state) {
     LOG_INFO("burst done");
 }
 
-int capture_video_start(AppState *state) {
+int capture_video_start(AppState *state) { LOG_FN();
     char path[1024];
     capture_build_filename(state, path, sizeof(path),
                            state->video_format.c_str());

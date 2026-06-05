@@ -74,7 +74,7 @@ static void yuyv_to_yuv420(const uint8_t *yuyv, AVFrame *frame,
     }
 }
 
-int video_open(AppState *state, const char *path) {
+int video_open(AppState *state, const char *path) { LOG_FN();
     LOG_DEBUG("video: opening output %s", path);
     int ret;
 
@@ -169,7 +169,7 @@ int video_open(AppState *state, const char *path) {
     return 0;
 }
 
-void video_write_frame(AppState *state, const void *data, size_t size) {
+void video_write_frame(AppState *state, const void *data, size_t size) { LOG_FN();
     if (!vid.open) return;
 
     av_frame_make_writable(vid.frame);
@@ -219,7 +219,7 @@ void video_write_frame(AppState *state, const void *data, size_t size) {
     }
 }
 
-void video_close(AppState *state) {
+void video_close(AppState *state) { LOG_FN();
     (void)state;
     if (!vid.open) return;
 

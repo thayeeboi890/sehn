@@ -219,7 +219,7 @@ static void handle_key(AppState *state, XKeyEvent *ev) {
 
 // ── main loop ────────────────────────────────────────────────────────────────
 
-int ui_run(AppState *state) {
+int ui_run(AppState *state) { LOG_FN();
 
     KeyMap km = keys_load(state);
     ui.dpy = XOpenDisplay(nullptr);

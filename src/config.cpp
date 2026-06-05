@@ -68,7 +68,7 @@ static bool toml_bool(toml_table_t *t, const char *key, bool fallback) {
     return d.ok ? (bool)d.u.b : fallback;
 }
 
-int config_load(AppState *state, const char *path) {
+int config_load(AppState *state, const char *path) { LOG_FN();
     std::string p = path ? path : default_config_path();
     if (p.empty()) return -1;
 
@@ -143,7 +143,7 @@ int config_load(AppState *state, const char *path) {
     return 0;
 }
 
-int config_apply_theme(AppState *state, const char *theme_name) {
+int config_apply_theme(AppState *state, const char *theme_name) { LOG_FN();
     std::string p = default_config_path();
     // themes live in the same dir as sehnrc.toml
     size_t slash = p.rfind('/');

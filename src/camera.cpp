@@ -45,7 +45,7 @@ static int xioctl(int fd, unsigned long request, void *arg) {
     return r;
 }
 
-int camera_negotiate(AppState *state) {
+int camera_negotiate(AppState *state) { LOG_FN();
     struct v4l2_format fmt = {};
     fmt.type                = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     fmt.fmt.pix.width       = state->width;
@@ -82,7 +82,7 @@ int camera_negotiate(AppState *state) {
     return 0;
 }
 
-int camera_open(AppState *state) {
+int camera_open(AppState *state) { LOG_FN();
     LOG_DEBUG("opening camera device %s", state->device.c_str());
     // open device
     cam.fd = open(state->device.c_str(), O_RDWR | O_NONBLOCK);
@@ -167,7 +167,7 @@ int camera_open(AppState *state) {
     return 0;
 }
 
-int camera_start(AppState *state) {
+int camera_start(AppState *state) { LOG_FN();
     (void)state;
     enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     if (xioctl(cam.fd, VIDIOC_STREAMON, &type) < 0) {
@@ -178,7 +178,7 @@ int camera_start(AppState *state) {
     return 0;
 }
 
-const void *camera_next_frame(AppState *state, size_t *out_size) {
+const void *camera_next_frame(AppState *state, size_t *out_size) { LOG_FN();
     (void)state;
 
     // wait for a frame with 2s timeout
@@ -221,7 +221,7 @@ void camera_stop(AppState *state) {
     cam.streaming = false;
 }
 
-void camera_close(AppState *state) {
+void camera_close(AppState *state) { LOG_FN();
     camera_stop(state);
     for (unsigned i = 0; i < cam.n_buffers; i++)
         munmap(cam.buffers[i].start, cam.buffers[i].length);

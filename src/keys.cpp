@@ -118,7 +118,7 @@ static Action action_from_str(const char *s) {
     return Action::Unknown;
 }
 
-KeyMap keys_load(AppState *state) {
+KeyMap keys_load(AppState *state) { LOG_FN();
     KeyMap km = keys_defaults();
 
     std::string p = default_keys_path();
