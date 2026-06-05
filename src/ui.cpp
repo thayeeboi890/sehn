@@ -176,47 +176,58 @@ static inline uint8_t clamp8(int x) { return x < 0 ? 0 : x > 255 ? 255 : (uint8_
 static void rgb_to_ximage_region(const uint8_t *rgb,
                                  uint32_t src_stride, uint32_t src_height,
                                  int sx, int sy,
-                                 uint32_t sw, uint32_t sh) {
-    uint32_t dw = (uint32_t)ui.ximg->width;
-    uint32_t dh = (uint32_t)ui.ximg->height;
+                                 uint32_t sw, uint32_t sh,
+                                 int dst_x, int dst_y,
+                                 uint32_t dst_w, uint32_t dst_h) {
+    uint32_t img_w = (uint32_t)ui.ximg->width;
+    uint32_t img_h = (uint32_t)ui.ximg->height;
     uint32_t *px = (uint32_t *)ui.ximg->data;
 
-    // choose bilinear when scaling (up or down) to improve quality
-    bool use_bilinear = (sw != dw) || (sh != dh);
+    // clear borders (letterbox/pillarbox) to black where image won't be drawn
+    uint32_t black = 0;
+    if (dst_x > 0 || dst_y > 0 || (uint32_t)(dst_x + dst_w) < img_w || (uint32_t)(dst_y + dst_h) < img_h) {
+        for (uint32_t y = 0; y < img_h; y++) {
+            for (uint32_t x = 0; x < img_w; x++) {
+                if (x < (uint32_t)dst_x || x >= (uint32_t)(dst_x + dst_w) || y < (uint32_t)dst_y || y >= (uint32_t)(dst_y + dst_h))
+                    px[y * img_w + x] = black;
+            }
+        }
+    }
+
+    // scaling factors
+    float scale_x = (float)sw / (float)dst_w;
+    float scale_y = (float)sh / (float)dst_h;
+
+    bool use_bilinear = (sw != dst_w) || (sh != dst_h);
 
     if (!use_bilinear) {
-        // nearest-neighbor (fast)
-        for (uint32_t dy = 0; dy < dh; dy++) {
-            for (uint32_t dx = 0; dx < dw; dx++) {
-                uint32_t fx = sx + (uint32_t)((float)dx * (float)sw / (float)dw);
-                uint32_t fy = sy + (uint32_t)((float)dy * (float)sh / (float)dh);
+        // nearest-neighbor into destination rectangle
+        for (uint32_t dy = 0; dy < dst_h; dy++) {
+            for (uint32_t dx = 0; dx < dst_w; dx++) {
+                uint32_t fx = sx + (uint32_t)((float)dx * scale_x);
+                uint32_t fy = sy + (uint32_t)((float)dy * scale_y);
                 if (fx >= src_stride) fx = src_stride - 1;
                 if (fy >= src_height) fy = src_height - 1;
                 const uint8_t *p = rgb + (fy * src_stride + fx) * 3;
-                px[dy * dw + dx] = ((uint32_t)p[0] << 16) |
-                                   ((uint32_t)p[1] << 8) |
-                                   (uint32_t)p[2];
+                px[(dst_y + dy) * img_w + (dst_x + dx)] = ((uint32_t)p[0] << 16) |
+                                                          ((uint32_t)p[1] << 8) |
+                                                          (uint32_t)p[2];
             }
         }
         return;
     }
 
-    // bilinear interpolation
-    float sx_f = (float)sx;
-    float sy_f = (float)sy;
-    float scale_x = (float)sw / (float)dw;
-    float scale_y = (float)sh / (float)dh;
-
-    for (uint32_t dy = 0; dy < dh; dy++) {
-        float src_y = sy_f + (dy + 0.5f) * scale_y - 0.5f;
+    // bilinear interpolation into destination rectangle
+    for (uint32_t dy = 0; dy < dst_h; dy++) {
+        float src_y = sy + (dy + 0.5f) * scale_y - 0.5f;
         int y0 = (int)floorf(src_y);
         int y1 = y0 + 1;
         float wy = src_y - (float)y0;
         if (y0 < 0) { y0 = 0; wy = src_y; }
         if (y1 >= (int)src_height) { y1 = src_height - 1; }
 
-        for (uint32_t dx = 0; dx < dw; dx++) {
-            float src_x = sx_f + (dx + 0.5f) * scale_x - 0.5f;
+        for (uint32_t dx = 0; dx < dst_w; dx++) {
+            float src_x = sx + (dx + 0.5f) * scale_x - 0.5f;
             int x0 = (int)floorf(src_x);
             int x1 = x0 + 1;
             float wx = src_x - (float)x0;
@@ -232,9 +243,9 @@ static void rgb_to_ximage_region(const uint8_t *rgb,
             int g = (int)((1-wx)*(1-wy)*p00[1] + wx*(1-wy)*p10[1] + (1-wx)*wy*p01[1] + wx*wy*p11[1]);
             int b = (int)((1-wx)*(1-wy)*p00[2] + wx*(1-wy)*p10[2] + (1-wx)*wy*p01[2] + wx*wy*p11[2]);
 
-            px[dy * dw + dx] = ((uint32_t)clamp8(r) << 16) |
-                               ((uint32_t)clamp8(g) << 8) |
-                               (uint32_t)clamp8(b);
+            px[(dst_y + dy) * img_w + (dst_x + dx)] = ((uint32_t)clamp8(r) << 16) |
+                                                     ((uint32_t)clamp8(g) << 8) |
+                                                     (uint32_t)clamp8(b);
         }
     }
 }
@@ -394,8 +405,44 @@ int ui_run(AppState *state) { LOG_FN();
             } else if (ev.type == ButtonPress) {
                 input_handle_button(state, &ev.xbutton);
             } else if (ev.type == ConfigureNotify) {
-                state->win_w = ev.xconfigure.width  - state->panel_width;
-                state->win_h = ev.xconfigure.height;
+                int new_win_w = ev.xconfigure.width  - state->panel_width;
+                int new_win_h = ev.xconfigure.height;
+
+                // preserve camera viewport center for manual zoom/pan mode
+                if (state->zoom_mode == ZoomMode::Percent) {
+                    // old source rect
+                    uint32_t old_src_w = (uint32_t)((float)state->width / state->zoom);
+                    uint32_t old_src_h = (uint32_t)((float)state->height / state->zoom);
+                    if (old_src_w > state->width) old_src_w = state->width;
+                    if (old_src_h > state->height) old_src_h = state->height;
+                    int old_src_x = state->pan_x;
+                    int old_src_y = state->pan_y;
+                    float center_x = old_src_x + old_src_w * 0.5f;
+                    float center_y = old_src_y + old_src_h * 0.5f;
+
+                    state->win_w = new_win_w;
+                    state->win_h = new_win_h;
+
+                    // new source rect (same zoom)
+                    uint32_t new_src_w = (uint32_t)((float)state->width / state->zoom);
+                    uint32_t new_src_h = (uint32_t)((float)state->height / state->zoom);
+                    if (new_src_w > state->width) new_src_w = state->width;
+                    if (new_src_h > state->height) new_src_h = state->height;
+
+                    state->pan_x = (int)(center_x - new_src_w * 0.5f);
+                    state->pan_y = (int)(center_y - new_src_h * 0.5f);
+
+                    int max_x = (int)state->width  - (int)new_src_w;
+                    int max_y = (int)state->height - (int)new_src_h;
+                    if (state->pan_x < 0)      state->pan_x = 0;
+                    if (state->pan_y < 0)      state->pan_y = 0;
+                    if (state->pan_x > max_x)  state->pan_x = max_x;
+                    if (state->pan_y > max_y)  state->pan_y = max_y;
+                } else {
+                    state->win_w = new_win_w;
+                    state->win_h = new_win_h;
+                }
+
                 // recreate XImage / shared memory if window size changed
                 if (ui.ximg && (ui.ximg->width != state->win_w || ui.ximg->height != state->win_h)) {
                     // clean up previous image/shm
@@ -499,11 +546,25 @@ int ui_run(AppState *state) { LOG_FN();
                   ui.ximg->width, ui.ximg->height,
                   state->win_w, state->win_h,
                   src_w, src_h, src_x, src_y, state->zoom);
-        rgb_to_ximage_region(rgb, state->width, state->height,
-                             src_x, src_y, src_w, src_h);
-        // destination size in window
+        // compute destination rectangle preserving aspect ratio of source region
         int dst_w = state->win_w;
         int dst_h = state->win_h;
+        float src_aspect = (float)src_w / (float)src_h;
+        float win_aspect = (float)state->win_w / (float)state->win_h;
+        int dst_img_w, dst_img_h;
+        if (win_aspect > src_aspect) {
+            dst_img_h = state->win_h;
+            dst_img_w = (int)(dst_img_h * src_aspect);
+        } else {
+            dst_img_w = state->win_w;
+            dst_img_h = (int)(dst_img_w / src_aspect);
+        }
+        int dst_x = (state->win_w - dst_img_w) / 2;
+        int dst_y = (state->win_h - dst_img_h) / 2;
+
+        rgb_to_ximage_region(rgb, state->width, state->height,
+                             src_x, src_y, src_w, src_h,
+                             dst_x, dst_y, dst_img_w, dst_img_h);
 
         // blit to window
         if (ui.shm_available)
