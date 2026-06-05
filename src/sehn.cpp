@@ -46,7 +46,7 @@ AppState make_default_state() {
     s.panel_width       = 64;
     s.win_w             = 960;
     s.win_h             = 540;
-    s.zoom_mode         = ZoomMode::Fit;
+    s.zoom_mode         = ZoomMode::Percent; /* start 1:1 (no scaling) for sharpness */
     s.zoom              = 1.0f;
     s.pan_x             = 0;
     s.pan_y             = 0;

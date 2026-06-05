@@ -65,10 +65,22 @@ static void do_action(AppState *state, Action action) {
             state->fullscreen = !state->fullscreen;
             break;
         case Action::ZoomIn:
-            state->zoom += 0.1f;
+            if (camera_has_zoom()) {
+                camera_zoom_rel(+1.0f);
+            } else {
+                state->zoom_mode = ZoomMode::Percent;
+                state->zoom += 0.1f;
+                camera_apply_controls(state);
+            }
             break;
         case Action::ZoomOut:
-            state->zoom = state->zoom > 0.2f ? state->zoom - 0.1f : 0.1f;
+            if (camera_has_zoom()) {
+                camera_zoom_rel(-1.0f);
+            } else {
+                state->zoom_mode = ZoomMode::Percent;
+                state->zoom = state->zoom > 0.2f ? state->zoom - 0.1f : 0.1f;
+                camera_apply_controls(state);
+            }
             break;
         case Action::ZoomFit:
             state->zoom_mode = ZoomMode::Fit;
@@ -77,13 +89,31 @@ static void do_action(AppState *state, Action action) {
             state->zoom_mode = ZoomMode::Fill;
             break;
         case Action::Zoom100:
-            state->zoom_mode = ZoomMode::Percent;
-            state->zoom = 1.0f;
+            if (camera_has_zoom()) {
+                // set to mid-range
+                camera_zoom_rel(+0.0f);
+            } else {
+                state->zoom_mode = ZoomMode::Percent;
+                state->zoom = 1.0f;
+                camera_apply_controls(state);
+            }
             break;
-        case Action::PanLeft:  state->pan_x -= 20; break;
-        case Action::PanRight: state->pan_x += 20; break;
-        case Action::PanUp:    state->pan_y -= 20; break;
-        case Action::PanDown:  state->pan_y += 20; break;
+        case Action::PanLeft:
+            if (camera_has_pan()) camera_pan_rel(-1, 0);
+            else { state->pan_x -= 20; camera_apply_controls(state); }
+            break;
+        case Action::PanRight:
+            if (camera_has_pan()) camera_pan_rel(+1, 0);
+            else { state->pan_x += 20; camera_apply_controls(state); }
+            break;
+        case Action::PanUp:
+            if (camera_has_tilt()) camera_pan_rel(0, -1);
+            else { state->pan_y -= 20; camera_apply_controls(state); }
+            break;
+        case Action::PanDown:
+            if (camera_has_tilt()) camera_pan_rel(0, +1);
+            else { state->pan_y += 20; camera_apply_controls(state); }
+            break;
         case Action::FlipHorizontal:
             // TODO: flip flag on state
             break;
@@ -123,8 +153,13 @@ static void do_action(AppState *state, Action action) {
 }
 
 void input_handle_key(AppState *state, const KeyMap &km, XKeyEvent *ev) {
+    // try unshifted first, then shifted — this handles CapsLock/Shift variations
     KeySym sym = XLookupKeysym(ev, 0);
     Action action = keys_lookup(km, sym);
+    if (action == Action::Unknown) {
+        sym = XLookupKeysym(ev, 1);
+        action = keys_lookup(km, sym);
+    }
     do_action(state, action);
 }
 

@@ -38,6 +38,73 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 // one CameraState per app, lives here
 static CameraState cam = {};
 
+// detected PTZ control info (populated at open)
+struct ControlInfo {
+    int id;
+    long minimum;
+    long maximum;
+    long step;
+    bool valid;
+};
+static ControlInfo pan_ctrl  = {0,0,0,0,false};
+static ControlInfo tilt_ctrl = {0,0,0,0,false};
+static ControlInfo zoom_ctrl = {0,0,0,0,false};
+
+// last UI values we synced to hardware
+static int  last_pan_x = 0;
+static int  last_pan_y = 0;
+static float last_zoom  = 1.0f;
+
+// case-insensitive substring search
+static bool contains_ci(const char *s, const char *sub) {
+    if (!s || !sub) return false;
+    for (; *s; s++) {
+        const char *p = s, *q = sub;
+        while (*p && *q && (tolower((unsigned char)*p) == tolower((unsigned char)*q))) { p++; q++; }
+        if (!*q) return true;
+    }
+    return false;
+}
+
+static int xioctl(int fd, unsigned long request, void *arg);
+
+static void camera_probe_controls(int fd) {
+    if (fd < 0) return;
+    struct v4l2_query_ext_ctrl qc = {};
+    qc.id = V4L2_CTRL_FLAG_NEXT_CTRL | V4L2_CTRL_FLAG_NEXT_COMPOUND;
+
+    while (xioctl(fd, VIDIOC_QUERY_EXT_CTRL, &qc) == 0) {
+        if (qc.flags & V4L2_CTRL_FLAG_DISABLED) {
+            qc.id |= V4L2_CTRL_FLAG_NEXT_CTRL | V4L2_CTRL_FLAG_NEXT_COMPOUND;
+            continue;
+        }
+
+        if (qc.type == V4L2_CTRL_TYPE_INTEGER || qc.type == V4L2_CTRL_TYPE_BOOLEAN) {
+            if (contains_ci(qc.name, "pan")) {
+                pan_ctrl.id = qc.id;
+                pan_ctrl.minimum = qc.minimum;
+                pan_ctrl.maximum = qc.maximum;
+                pan_ctrl.step = qc.step;
+                pan_ctrl.valid = true;
+            } else if (contains_ci(qc.name, "tilt")) {
+                tilt_ctrl.id = qc.id;
+                tilt_ctrl.minimum = qc.minimum;
+                tilt_ctrl.maximum = qc.maximum;
+                tilt_ctrl.step = qc.step;
+                tilt_ctrl.valid = true;
+            } else if (contains_ci(qc.name, "zoom")) {
+                zoom_ctrl.id = qc.id;
+                zoom_ctrl.minimum = qc.minimum;
+                zoom_ctrl.maximum = qc.maximum;
+                zoom_ctrl.step = qc.step;
+                zoom_ctrl.valid = true;
+            }
+        }
+
+        qc.id |= V4L2_CTRL_FLAG_NEXT_CTRL | V4L2_CTRL_FLAG_NEXT_COMPOUND;
+    }
+}
+
 static int xioctl(int fd, unsigned long request, void *arg) {
     int r;
     do { r = ioctl(fd, request, arg); }
@@ -164,6 +231,19 @@ int camera_open(AppState *state) { LOG_FN();
     }
 
     state->camera_fd = cam.fd;
+    // probe for PTZ controls once camera is opened
+    camera_probe_controls(cam.fd);
+
+    // if camera supports zoom, set to fully zoomed out (minimum)
+    if (zoom_ctrl.valid) {
+        struct v4l2_control ctrl = {};
+        ctrl.id = zoom_ctrl.id;
+        ctrl.value = (int)zoom_ctrl.minimum;
+        if (xioctl(cam.fd, VIDIOC_S_CTRL, &ctrl) < 0) {
+            perror("VIDIOC_S_CTRL zoom init");
+        }
+    }
+
     return 0;
 }
 
@@ -233,7 +313,144 @@ void camera_close(AppState *state) { LOG_FN();
     state->camera_fd = -1;
 }
 
+
+bool camera_has_pan() { return pan_ctrl.valid; }
+bool camera_has_tilt() { return tilt_ctrl.valid; }
+bool camera_has_zoom() { return zoom_ctrl.valid; }
+
+void camera_pan_rel(int dx, int dy) {
+    if (cam.fd < 0) return;
+    time_t now = time(nullptr);
+
+    // horizontal
+    if (dx != 0 && pan_ctrl.valid) {
+        struct v4l2_control ctrl = {};
+        ctrl.id = pan_ctrl.id;
+        if (xioctl(cam.fd, VIDIOC_G_CTRL, &ctrl) == 0) {
+            long cur = ctrl.value;
+            long step = pan_ctrl.step ? pan_ctrl.step : (pan_ctrl.maximum - pan_ctrl.minimum) / 20;
+            long nv = cur + dx * step; // dx is ±1 per press
+            if (nv < pan_ctrl.minimum) nv = pan_ctrl.minimum;
+            if (nv > pan_ctrl.maximum) nv = pan_ctrl.maximum;
+            ctrl.value = (int)nv;
+            if (xioctl(cam.fd, VIDIOC_S_CTRL, &ctrl) < 0)
+                perror("VIDIOC_S_CTRL pan_rel");
+        }
+    }
+
+    // vertical (invert so Up moves camera up visually)
+    if (dy != 0 && tilt_ctrl.valid) {
+        struct v4l2_control ctrl = {};
+        ctrl.id = tilt_ctrl.id;
+        if (xioctl(cam.fd, VIDIOC_G_CTRL, &ctrl) == 0) {
+            long cur = ctrl.value;
+            long step = tilt_ctrl.step ? tilt_ctrl.step : (tilt_ctrl.maximum - tilt_ctrl.minimum) / 20;
+            long nv = cur - dy * step; // note inversion
+            if (nv < tilt_ctrl.minimum) nv = tilt_ctrl.minimum;
+            if (nv > tilt_ctrl.maximum) nv = tilt_ctrl.maximum;
+            ctrl.value = (int)nv;
+            if (xioctl(cam.fd, VIDIOC_S_CTRL, &ctrl) < 0)
+                perror("VIDIOC_S_CTRL tilt_rel");
+        }
+    }
+}
+
+void camera_zoom_rel(float delta) {
+    if (cam.fd < 0 || !zoom_ctrl.valid) return;
+    struct v4l2_control ctrl = {};
+    ctrl.id = zoom_ctrl.id;
+    if (xioctl(cam.fd, VIDIOC_G_CTRL, &ctrl) == 0) {
+        long cur = ctrl.value;
+        long step = zoom_ctrl.step ? zoom_ctrl.step : 1;
+        long nv = cur + (delta > 0 ? step : -step);
+        if (nv < zoom_ctrl.minimum) nv = zoom_ctrl.minimum;
+        if (nv > zoom_ctrl.maximum) nv = zoom_ctrl.maximum;
+        ctrl.value = (int)nv;
+        if (xioctl(cam.fd, VIDIOC_S_CTRL, &ctrl) < 0)
+            perror("VIDIOC_S_CTRL zoom_rel");
+    }
+}
+
 void camera_apply_controls(AppState *state) {
-    // TODO: VIDIOC_QUERYCTRL + VIDIOC_S_CTRL for each control in state
-    (void)state;
+    if (cam.fd < 0) return;
+    time_t now = time(nullptr);
+
+    // For legacy behavior (state-based), fall back to the previous implementation
+    // PAN
+    int dx = state->pan_x - last_pan_x;
+    if (dx != 0) {
+        if (pan_ctrl.valid) {
+            struct v4l2_control ctrl = {};
+            ctrl.id = pan_ctrl.id;
+            if (xioctl(cam.fd, VIDIOC_G_CTRL, &ctrl) == 0) {
+                long cur = ctrl.value;
+                long step = pan_ctrl.step ? pan_ctrl.step : (pan_ctrl.maximum - pan_ctrl.minimum) / 20;
+                long steps = dx / 20;
+                if (steps == 0) steps = (dx > 0) ? 1 : -1;
+                long nv = cur + steps * step;
+                if (nv < pan_ctrl.minimum) nv = pan_ctrl.minimum;
+                if (nv > pan_ctrl.maximum) nv = pan_ctrl.maximum;
+                ctrl.value = (int)nv;
+                if (xioctl(cam.fd, VIDIOC_S_CTRL, &ctrl) < 0)
+                    perror("VIDIOC_S_CTRL pan");
+            }
+        } else {
+            state->notification = "Camera has no pan control";
+            state->notification_until = now + 2;
+        }
+        last_pan_x = state->pan_x;
+    }
+
+    // TILT (legacy)
+    int dy = state->pan_y - last_pan_y;
+    if (dy != 0) {
+        if (tilt_ctrl.valid) {
+            struct v4l2_control ctrl = {};
+            ctrl.id = tilt_ctrl.id;
+            if (xioctl(cam.fd, VIDIOC_G_CTRL, &ctrl) == 0) {
+                long cur = ctrl.value;
+                long step = tilt_ctrl.step ? tilt_ctrl.step : (tilt_ctrl.maximum - tilt_ctrl.minimum) / 20;
+                long steps = dy / 20;
+                if (steps == 0) steps = (dy > 0) ? 1 : -1;
+                long nv = cur - steps * step; // inverted
+                if (nv < tilt_ctrl.minimum) nv = tilt_ctrl.minimum;
+                if (nv > tilt_ctrl.maximum) nv = tilt_ctrl.maximum;
+                ctrl.value = (int)nv;
+                if (xioctl(cam.fd, VIDIOC_S_CTRL, &ctrl) < 0)
+                    perror("VIDIOC_S_CTRL tilt");
+            }
+        } else {
+            state->notification = "Camera has no tilt control";
+            state->notification_until = now + 2;
+        }
+        last_pan_y = state->pan_y;
+    }
+
+    // ZOOM (legacy)
+    if (zoom_ctrl.valid) {
+        float z = state->zoom;
+        if (z != last_zoom) {
+            struct v4l2_control ctrl = {};
+            ctrl.id = zoom_ctrl.id;
+            if (xioctl(cam.fd, VIDIOC_G_CTRL, &ctrl) == 0) {
+                long cur = ctrl.value;
+                // map zoom float around 1.0.. to control range
+                long range = zoom_ctrl.maximum - zoom_ctrl.minimum;
+                long target = zoom_ctrl.minimum + (long)((z - 0.1f) / 10.0f * range);
+                if (target < zoom_ctrl.minimum) target = zoom_ctrl.minimum;
+                if (target > zoom_ctrl.maximum) target = zoom_ctrl.maximum;
+                ctrl.value = (int)target;
+                if (xioctl(cam.fd, VIDIOC_S_CTRL, &ctrl) < 0)
+                    perror("VIDIOC_S_CTRL zoom");
+            }
+            last_zoom = z;
+        }
+    } else {
+        // if UI requested zoom but camera has no zoom control, notify once
+        if (state->zoom != last_zoom) {
+            state->notification = "Camera has no zoom control";
+            state->notification_until = now + 2;
+            last_zoom = state->zoom;
+        }
+    }
 }

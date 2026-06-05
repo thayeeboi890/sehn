@@ -27,6 +27,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include <string>
 #include <cstdint>
+#include <ctime>
 
 // forward declarations
 struct CameraState;
@@ -109,6 +110,10 @@ struct AppState {
     bool        running;   
     std::string theme;        
     std::string config_path; 
+
+    // --- notifications ---
+    std::string notification; /* transient user-visible message */
+    time_t      notification_until; /* time when notification expires */
 };
 
 AppState make_default_state();

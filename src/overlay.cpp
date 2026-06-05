@@ -69,4 +69,17 @@ void overlay_draw(AppState *state, Display *dpy, Window win, GC gc) {
     struct tm *tm = localtime(&now);
     strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", tm);
     XDrawString(dpy, win, gc, 8, state->win_h - 8, buf, strlen(buf));
+
+    // center: transient notification (if any)
+    if (!state->notification.empty()) {
+        if (state->notification_until > now) {
+            // approximate centering using character width ~8 px
+            int len = (int)strlen(state->notification.c_str());
+            int x = state->win_w / 2 - (len * 8) / 2;
+            if (x < 8) x = 8;
+            XDrawString(dpy, win, gc, x, state->win_h / 2, state->notification.c_str(), (int)state->notification.size());
+        } else {
+            state->notification.clear();
+        }
+    }
 }

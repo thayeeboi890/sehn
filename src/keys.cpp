@@ -57,7 +57,10 @@ KeyMap keys_defaults() {
     km[XK_o]         = Action::ToggleOverlay;
     km[XK_f]         = Action::ToggleFullscreen;
     km[XK_plus]      = Action::ZoomIn;
+    km[XK_equal]     = Action::ZoomIn; /* many layouts produce '=' unshifted */
+    km[XK_KP_Add]    = Action::ZoomIn; /* keypad + */
     km[XK_minus]     = Action::ZoomOut;
+    km[XK_KP_Subtract] = Action::ZoomOut; /* keypad - */
     km[XK_z]         = Action::ZoomFit;
     km[XK_Z]         = Action::ZoomFill;
     km[XK_asterisk]  = Action::Zoom100;

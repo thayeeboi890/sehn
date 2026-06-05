@@ -57,6 +57,8 @@ struct UIState {
 };
 
 static UIState ui = {};
+static volatile int ui_shm_error = 0; /* set by X error handler when XShmAttach fails */
+static int ui_shm_error_handler(Display *d, XErrorEvent *ev) { (void)d; (void)ev; ui_shm_error = 1; return 0; }
 
 // ── format conversion ────────────────────────────────────────────────────────
 
@@ -125,7 +127,7 @@ static bool shm_init(AppState *state) {
 
     ui.ximg = XShmCreateImage(ui.dpy, vis, depth, ZPixmap,
                                nullptr, &ui.shm_info,
-                               state->width, state->height);
+                               state->win_w, state->win_h);
     if (!ui.ximg) return false;
 
     ui.shm_info.shmid = shmget(IPC_PRIVATE,
@@ -137,7 +139,20 @@ static bool shm_init(AppState *state) {
         (char *)shmat(ui.shm_info.shmid, nullptr, 0);
     ui.shm_info.readOnly = False;
 
-    if (!XShmAttach(ui.dpy, &ui.shm_info)) return false;
+    // XShmAttach may generate a BadAccess error if the X server disallows MIT-SHM.
+    // Install a temporary error handler to catch that and fall back cleanly.
+    ui_shm_error = 0;
+    // error handler sets ui_shm_error
+
+    XErrorHandler oldh = XSetErrorHandler(ui_shm_error_handler);
+    XShmAttach(ui.dpy, &ui.shm_info);
+    XSync(ui.dpy, False);
+    XSetErrorHandler(oldh);
+    if (ui_shm_error) {
+        // detach any partial attach if necessary
+        XShmDetach(ui.dpy, &ui.shm_info);
+        return false;
+    }
     return true;
 }
 
@@ -154,13 +169,73 @@ static void shm_cleanup() {
 // ── rgb -> XImage ─────────────────────────────────────────────────────────────
 // Converts planar RGB into the packed BGRX format X11 expects.
 
-static void rgb_to_ximage(const uint8_t *rgb, uint32_t width, uint32_t height) {
+#include <cmath>
+
+static inline uint8_t clamp8(int x) { return x < 0 ? 0 : x > 255 ? 255 : (uint8_t)x; }
+
+static void rgb_to_ximage_region(const uint8_t *rgb,
+                                 uint32_t src_stride, uint32_t src_height,
+                                 int sx, int sy,
+                                 uint32_t sw, uint32_t sh) {
+    uint32_t dw = (uint32_t)ui.ximg->width;
+    uint32_t dh = (uint32_t)ui.ximg->height;
     uint32_t *px = (uint32_t *)ui.ximg->data;
-    for (uint32_t i = 0; i < width * height; i++) {
-        uint8_t r = rgb[i*3+0];
-        uint8_t g = rgb[i*3+1];
-        uint8_t b = rgb[i*3+2];
-        px[i] = (r << 16) | (g << 8) | b;
+
+    // choose bilinear when scaling (up or down) to improve quality
+    bool use_bilinear = (sw != dw) || (sh != dh);
+
+    if (!use_bilinear) {
+        // nearest-neighbor (fast)
+        for (uint32_t dy = 0; dy < dh; dy++) {
+            for (uint32_t dx = 0; dx < dw; dx++) {
+                uint32_t fx = sx + (uint32_t)((float)dx * (float)sw / (float)dw);
+                uint32_t fy = sy + (uint32_t)((float)dy * (float)sh / (float)dh);
+                if (fx >= src_stride) fx = src_stride - 1;
+                if (fy >= src_height) fy = src_height - 1;
+                const uint8_t *p = rgb + (fy * src_stride + fx) * 3;
+                px[dy * dw + dx] = ((uint32_t)p[0] << 16) |
+                                   ((uint32_t)p[1] << 8) |
+                                   (uint32_t)p[2];
+            }
+        }
+        return;
+    }
+
+    // bilinear interpolation
+    float sx_f = (float)sx;
+    float sy_f = (float)sy;
+    float scale_x = (float)sw / (float)dw;
+    float scale_y = (float)sh / (float)dh;
+
+    for (uint32_t dy = 0; dy < dh; dy++) {
+        float src_y = sy_f + (dy + 0.5f) * scale_y - 0.5f;
+        int y0 = (int)floorf(src_y);
+        int y1 = y0 + 1;
+        float wy = src_y - (float)y0;
+        if (y0 < 0) { y0 = 0; wy = src_y; }
+        if (y1 >= (int)src_height) { y1 = src_height - 1; }
+
+        for (uint32_t dx = 0; dx < dw; dx++) {
+            float src_x = sx_f + (dx + 0.5f) * scale_x - 0.5f;
+            int x0 = (int)floorf(src_x);
+            int x1 = x0 + 1;
+            float wx = src_x - (float)x0;
+            if (x0 < 0) { x0 = 0; wx = src_x; }
+            if (x1 >= (int)src_stride) { x1 = src_stride - 1; }
+
+            const uint8_t *p00 = rgb + (y0 * src_stride + x0) * 3;
+            const uint8_t *p10 = rgb + (y0 * src_stride + x1) * 3;
+            const uint8_t *p01 = rgb + (y1 * src_stride + x0) * 3;
+            const uint8_t *p11 = rgb + (y1 * src_stride + x1) * 3;
+
+            int r = (int)((1-wx)*(1-wy)*p00[0] + wx*(1-wy)*p10[0] + (1-wx)*wy*p01[0] + wx*wy*p11[0]);
+            int g = (int)((1-wx)*(1-wy)*p00[1] + wx*(1-wy)*p10[1] + (1-wx)*wy*p01[1] + wx*wy*p11[1]);
+            int b = (int)((1-wx)*(1-wy)*p00[2] + wx*(1-wy)*p10[2] + (1-wx)*wy*p01[2] + wx*wy*p11[2]);
+
+            px[dy * dw + dx] = ((uint32_t)clamp8(r) << 16) |
+                               ((uint32_t)clamp8(g) << 8) |
+                               (uint32_t)clamp8(b);
+        }
     }
 }
 
@@ -243,7 +318,16 @@ int ui_run(AppState *state) { LOG_FN();
     XSelectInput(ui.dpy, ui.win,
                  ExposureMask | KeyPressMask |
                  ButtonPressMask | StructureNotifyMask);
-
+    // grab arrow keys and other special keys so WM doesn't steal them
+    XGrabKey(ui.dpy, XKeysymToKeycode(ui.dpy, XK_Left),  AnyModifier, ui.win, True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(ui.dpy, XKeysymToKeycode(ui.dpy, XK_Right), AnyModifier, ui.win, True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(ui.dpy, XKeysymToKeycode(ui.dpy, XK_Up),    AnyModifier, ui.win, True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(ui.dpy, XKeysymToKeycode(ui.dpy, XK_Down),  AnyModifier, ui.win, True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(ui.dpy, XKeysymToKeycode(ui.dpy, XK_plus),  AnyModifier, ui.win, True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(ui.dpy, XKeysymToKeycode(ui.dpy, XK_equal), AnyModifier, ui.win, True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(ui.dpy, XKeysymToKeycode(ui.dpy, XK_KP_Add), AnyModifier, ui.win, True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(ui.dpy, XKeysymToKeycode(ui.dpy, XK_minus), AnyModifier, ui.win, True, GrabModeAsync, GrabModeAsync);
+    XGrabKey(ui.dpy, XKeysymToKeycode(ui.dpy, XK_KP_Subtract), AnyModifier, ui.win, True, GrabModeAsync, GrabModeAsync);
     // handle WM_DELETE_WINDOW so closing the window quits cleanly
     Atom wm_delete = XInternAtom(ui.dpy, "WM_DELETE_WINDOW", False);
     XSetWMProtocols(ui.dpy, ui.win, &wm_delete, 1);
@@ -283,11 +367,11 @@ int ui_run(AppState *state) { LOG_FN();
         int screen   = DefaultScreen(ui.dpy);
         Visual *vis  = DefaultVisual(ui.dpy, screen);
         int depth    = DefaultDepth(ui.dpy, screen);
-        ui.rgb_size  = (size_t)state->width * state->height * 4;
+        ui.rgb_size  = (size_t)state->win_w * state->win_h * 4;
         ui.rgb_buf   = (unsigned char *)malloc(ui.rgb_size);
         ui.ximg      = XCreateImage(ui.dpy, vis, depth, ZPixmap, 0,
                                      (char *)ui.rgb_buf,
-                                     state->width, state->height, 32, 0);
+                                     state->win_w, state->win_h, 32, 0);
     }
 
     // intermediate RGB buffer for format conversion
@@ -295,6 +379,7 @@ int ui_run(AppState *state) { LOG_FN();
     uint8_t *rgb    = (uint8_t *)malloc(rgb_sz);
 
     state->running  = true;
+    bool prev_fullscreen = state->fullscreen;
 
     while (state->running) {
         signals_dispatch(state);
@@ -311,7 +396,46 @@ int ui_run(AppState *state) { LOG_FN();
             } else if (ev.type == ConfigureNotify) {
                 state->win_w = ev.xconfigure.width  - state->panel_width;
                 state->win_h = ev.xconfigure.height;
+                // recreate XImage / shared memory if window size changed
+                if (ui.ximg && (ui.ximg->width != state->win_w || ui.ximg->height != state->win_h)) {
+                    // clean up previous image/shm
+                    shm_cleanup();
+
+                    // attempt to re-init XShm with new window size
+                    ui.shm_available = shm_init(state);
+                    if (ui.shm_available) {
+                        // if we previously had a fallback rgb buffer, free it
+                        if (ui.rgb_buf) { free(ui.rgb_buf); ui.rgb_buf = nullptr; ui.rgb_size = 0; }
+                    } else {
+                        LOG_DEBUG("XShm unavailable after resize, falling back to XPutImage");
+                        int screen   = DefaultScreen(ui.dpy);
+                        Visual *vis  = DefaultVisual(ui.dpy, screen);
+                        int depth    = DefaultDepth(ui.dpy, screen);
+                        ui.rgb_size  = (size_t)state->win_w * state->win_h * 4;
+                        ui.rgb_buf   = (unsigned char *)realloc(ui.rgb_buf, ui.rgb_size);
+                        ui.ximg      = XCreateImage(ui.dpy, vis, depth, ZPixmap, 0,
+                                                     (char *)ui.rgb_buf,
+                                                     state->win_w, state->win_h, 32, 0);
+                    }
+                }
             }
+        }
+
+        // handle fullscreen toggle requests from keys by sending _NET_WM_STATE messages
+        if (state->fullscreen != prev_fullscreen) {
+            Atom wm_state   = XInternAtom(ui.dpy, "_NET_WM_STATE", False);
+            Atom wm_fullscr = XInternAtom(ui.dpy, "_NET_WM_STATE_FULLSCREEN", False);
+            XEvent xev = {};
+            xev.xclient.type = ClientMessage;
+            xev.xclient.message_type = wm_state;
+            xev.xclient.window = ui.win;
+            xev.xclient.format = 32;
+            xev.xclient.data.l[0] = state->fullscreen ? 1 : 0; // _NET_WM_STATE_ADD : _NET_WM_STATE_REMOVE
+            xev.xclient.data.l[1] = (long)wm_fullscr;
+            xev.xclient.data.l[2] = 0;
+            XSendEvent(ui.dpy, RootWindow(ui.dpy, ui.screen), False,
+                       SubstructureRedirectMask | SubstructureNotifyMask, &xev);
+            prev_fullscreen = state->fullscreen;
         }
 
         // grab a frame
@@ -331,16 +455,63 @@ int ui_run(AppState *state) { LOG_FN();
                         state->width, state->height);
         }
 
-        // push to XImage
-        rgb_to_ximage(rgb, state->width, state->height);
+        // apply zoom and pan
+        uint32_t src_w, src_h;
+        int src_x, src_y;
+
+        if (state->zoom_mode == ZoomMode::Fit ||
+            state->zoom_mode == ZoomMode::Fill) {
+            // fit: scale so the whole frame fits in the window
+            float scale_x = (float)state->win_w / (float)state->width;
+            float scale_y = (float)state->win_h / (float)state->height;
+            float scale   = (state->zoom_mode == ZoomMode::Fill)
+                            ? (scale_x > scale_y ? scale_x : scale_y)
+                            : (scale_x < scale_y ? scale_x : scale_y);
+            src_w = state->width;
+            src_h = state->height;
+            src_x = 0;
+            src_y = 0;
+            state->zoom = scale;
+        } else {
+            // manual percent zoom — src region is a crop of the frame
+            float inv   = 1.0f / state->zoom;
+            src_w = (uint32_t)((float)state->width  * inv);
+            src_h = (uint32_t)((float)state->height * inv);
+
+            // never exceed actual frame dimensions
+            if (src_w > state->width)  src_w = state->width;
+            if (src_h > state->height) src_h = state->height;
+
+            // clamp pan so we never go out of frame
+            // clamp pan so we never go out of frame
+            int max_x = (int)state->width  - (int)src_w;
+            int max_y = (int)state->height - (int)src_h;
+            if (state->pan_x < 0)      state->pan_x = 0;
+            if (state->pan_y < 0)      state->pan_y = 0;
+            if (state->pan_x > max_x)  state->pan_x = max_x;
+            if (state->pan_y > max_y)  state->pan_y = max_y;
+            src_x = state->pan_x;
+            src_y = state->pan_y;
+        }
+
+        // push to XImage — only the src region
+        LOG_DEBUG("ximg=%dx%d win=%dx%d src=%ux%u @ %d,%d zoom=%.2f",
+                  ui.ximg->width, ui.ximg->height,
+                  state->win_w, state->win_h,
+                  src_w, src_h, src_x, src_y, state->zoom);
+        rgb_to_ximage_region(rgb, state->width, state->height,
+                             src_x, src_y, src_w, src_h);
+        // destination size in window
+        int dst_w = state->win_w;
+        int dst_h = state->win_h;
 
         // blit to window
         if (ui.shm_available)
             XShmPutImage(ui.dpy, ui.win, ui.gc, ui.ximg,
-                         0, 0, 0, 0, state->width, state->height, False);
+                         0, 0, 0, 0, dst_w, dst_h, False);
         else
             XPutImage(ui.dpy, ui.win, ui.gc, ui.ximg,
-                      0, 0, 0, 0, state->width, state->height);
+                      0, 0, 0, 0, dst_w, dst_h);        
         if (state->panel_visible)
             panel_draw(state, ui.dpy, ui.win, ui.gc);
         if (state->overlay_visible)

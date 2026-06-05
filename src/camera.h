@@ -47,4 +47,11 @@ const void *camera_next_frame(AppState *state, size_t *out_size);
 void        camera_stop(AppState *state);
 void        camera_close(AppState *state);
 void        camera_apply_controls(AppState *state);
+
+bool        camera_has_pan();
+bool        camera_has_tilt();
+bool        camera_has_zoom();
+
+void        camera_pan_rel(int dx, int dy); /* dx/dy in UI-pan steps (±1) */
+void        camera_zoom_rel(float delta); /* delta is zoom multiplier delta */
 int         camera_negotiate(AppState *state);
