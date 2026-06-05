@@ -86,8 +86,7 @@ int main(int argc, char *argv[]) { LOG_FN();
         return 1;
     }
 
-    printf("sehn: streaming from %s at %ux%u\n",
-           state.device.c_str(), state.width, state.height);
+    LOG_INFO("sehn: streaming from %s at %ux%u\n", state.device.c_str(), state.width, state.height);
 
     // 9. run ui
     int ret = ui_run(&state);

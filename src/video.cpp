@@ -25,6 +25,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "video.h"
 #include "capture.h"
+#include "utils.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -38,7 +39,6 @@ extern "C" {
 #include <libavutil/opt.h>
 #include <libavutil/imgutils.h>
 #include <libswscale/swscale.h>
-#include "utils.h"
 }
 
 struct VideoState {

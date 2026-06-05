@@ -11,7 +11,6 @@ sources = files(
   'panel.cpp',
   'overlay.cpp',
   'capture.cpp',
-  'cli.cpp',
   'files.cpp',
   'keys.cpp',
   'input.cpp',

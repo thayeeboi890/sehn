@@ -24,13 +24,13 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 #include "keys.h"
+#include "utils.h"
 #include <X11/keysym.h>
 #include <cstdio>
 #include <cstring>
 
 extern "C" {
 #include "../subprojects/tomlc99/toml.h"
-#include "utils.h"
 }
 
 static std::string default_keys_path() {
