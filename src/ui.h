@@ -32,3 +32,8 @@ int ui_run(AppState *state);
 
 // Tear down the X11 window and free resources.
 void ui_cleanup(AppState *state);
+
+// Present the last-converted RGB frame using the provided source rectangle.
+// This is used by input handlers to render software-only pan/zoom while dragging
+// without committing hardware PTZ until release.
+void ui_present_last_rgb_region(AppState *state, int src_x, int src_y, uint32_t src_w, uint32_t src_h);

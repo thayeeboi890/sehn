@@ -27,8 +27,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "capture.h"
 #include "camera.h"
 #include "panel.h"
+#include "utils.h"
+#include "ui.h"
 #include <X11/keysym.h>
 #include <cstdio>
+#include <cmath>
+#include <time.h>
 
 static void do_action(AppState *state, Action action) {
     switch (action) {
@@ -126,23 +130,40 @@ static void do_action(AppState *state, Action action) {
             break;
         case Action::ToggleExposure:
             state->exposure_mode = (state->exposure_mode == "auto") ? "manual" : "auto";
+            camera_apply_controls(state);
             break;
         case Action::ExposureUp:
             state->exposure_time += 1000;
+            camera_apply_controls(state);
             break;
         case Action::ExposureDown:
             state->exposure_time = state->exposure_time > 1000
                                    ? state->exposure_time - 1000 : 0;
+            camera_apply_controls(state);
             break;
-        case Action::GainUp:   state->gain += 10; break;
-        case Action::GainDown: state->gain = state->gain > 10 ? state->gain - 10 : 0; break;
+        case Action::GainUp:
+            state->gain += 10;
+            camera_apply_controls(state);
+            break;
+        case Action::GainDown:
+            state->gain = state->gain > 10 ? state->gain - 10 : 0;
+            camera_apply_controls(state);
+            break;
         case Action::ToggleWB:
             state->wb_mode = (state->wb_mode == "auto") ? "manual" : "auto";
+            camera_apply_controls(state);
             break;
-        case Action::WBWarmer: state->wb_temp += 100; break;
-        case Action::WBCooler: state->wb_temp -= 100; break;
+        case Action::WBWarmer:
+            state->wb_temp += 100;
+            camera_apply_controls(state);
+            break;
+        case Action::WBCooler:
+            state->wb_temp -= 100;
+            camera_apply_controls(state);
+            break;
         case Action::ToggleAutofocus:
             state->autofocus = !state->autofocus;
+            camera_apply_controls(state);
             break;
         case Action::ToggleInfo:
             state->overlay_visible = !state->overlay_visible;
@@ -164,11 +185,145 @@ void input_handle_key(AppState *state, const KeyMap &km, XKeyEvent *ev) {
 }
 
 void input_handle_button(AppState *state, XButtonEvent *ev) {
+    // button press
+    int btn = ev->button;
     int hit = panel_hittest(state, ev->x, ev->y);
-    switch (hit) {
-        case PANEL_SHUTTER: do_action(state, Action::Capture); break;
-        case PANEL_MODE:    do_action(state, Action::NextMode); break;
-        case PANEL_MENU:    /* TODO: open menu */ break;
-        default: break;
+    if (hit >= 0) {
+        switch (hit) {
+            case PANEL_SHUTTER:
+                do_action(state, Action::Capture);
+                return;
+            case PANEL_MODE:
+                do_action(state, Action::NextMode);
+                return;
+            case PANEL_MENU:
+                /* TODO: open menu */
+                return;
+            default:
+                return;
+        }
+    }
+
+    // Do not start any pan/tilt drag on left-click: PTZ via mouse is disabled.
+    // Only handle non-PTZ buttons here: right-click (toggle panel), middle-click (zoom fit), wheel and ctrl+wheel.
+    if (btn == 3) {
+        // toggle menu/panel
+        state->panel_visible = !state->panel_visible;
+        return;
+    }
+
+    if (btn == 2) {
+        // middle click -> reset to fit
+        state->zoom_mode = ZoomMode::Fit;
+        return;
+    }
+
+    if (btn == 4 || btn == 5) {
+        // wheel up/down: immediate action on press
+        if (ev->state & ControlMask) {
+            // Ctrl+wheel adjusts exposure in manual mode
+            if (btn == 4) do_action(state, Action::ExposureUp);
+            else           do_action(state, Action::ExposureDown);
+        } else {
+            // Zoom: be more aggressive per tick
+            if (camera_has_zoom()) {
+                if (btn == 4) camera_zoom_rel(+2.0f);
+                else           camera_zoom_rel(-2.0f);
+            } else {
+                if (btn == 4) {
+                    state->zoom *= 1.25f;
+                    if (state->zoom > 10.0f) state->zoom = 10.0f;
+                } else {
+                    state->zoom /= 1.25f;
+                    if (state->zoom < 0.1f) state->zoom = 0.1f;
+                }
+                camera_apply_controls(state);
+            }
+        }
+        return;
+    }
+
+    // other buttons (including left click) are ignored for pan/tilt purposes
+}
+
+void input_handle_button_release(AppState *state, XButtonEvent *ev) {
+    // PTZ via mouse is disabled. Clear any drag state and do not commit hardware pan/tilt.
+    (void)ev;
+    state->mouse_dragging = false;
+    state->mouse_button = 0;
+}
+
+void input_handle_motion(AppState *state, XMotionEvent *ev) {
+    if (!state->mouse_dragging) return;
+    int btn = state->mouse_button;
+    int dx = ev->x - state->mouse_down_x;
+    int dy = ev->y - state->mouse_down_y;
+
+    // compute current source region size for manual zoom
+    uint32_t src_w = (uint32_t)((float)state->width / state->zoom);
+    uint32_t src_h = (uint32_t)((float)state->height / state->zoom);
+    if (src_w > state->width) src_w = state->width;
+    if (src_h > state->height) src_h = state->height;
+
+    // compute destination image size in window (preserve aspect)
+    float src_aspect = (float)src_w / (float)src_h;
+    float win_aspect = (float)state->win_w / (float)state->win_h;
+    int dst_img_w, dst_img_h;
+    if (win_aspect > src_aspect) {
+        dst_img_h = state->win_h;
+        dst_img_w = (int)(dst_img_h * src_aspect);
+    } else {
+        dst_img_w = state->win_w;
+        dst_img_h = (int)(dst_img_w / src_aspect);
+    }
+
+    if (btn == 1) {
+        // pan: map pixel motion to source pixels (drag direction matches pan direction)
+        float sx = (float)src_w / (float)dst_img_w;
+        int max_x = (int)state->width - (int)src_w;
+        int max_y = (int)state->height - (int)src_h;
+
+        if (camera_has_pan() || camera_has_tilt()) {
+            // compute new_pan pixel coords for smooth local panning
+            int new_pan_x = state->mouse_start_pan_x - (int)roundf(dx * sx);
+            int new_pan_y = state->mouse_start_pan_y + (int)roundf(dy * sx);
+            if (new_pan_x < 0) new_pan_x = 0;
+            if (new_pan_x > max_x) new_pan_x = max_x;
+            if (new_pan_y < 0) new_pan_y = 0;
+            if (new_pan_y > max_y) new_pan_y = max_y;
+            // update visual pan immediately for smoothness
+            state->pan_x = new_pan_x;
+            state->pan_y = new_pan_y;
+            LOG_DEBUG("input: software-smooth pan to px=%d py=%d (dx=%d dy=%d)", new_pan_x, new_pan_y, dx, dy);
+            // redraw using last converted RGB so movement is immediate
+            ui_present_last_rgb_region(state, state->pan_x, state->pan_y, src_w, src_h);
+
+        } else {
+            int new_pan_x = state->mouse_start_pan_x - (int)roundf(dx * sx);
+            int new_pan_y = state->mouse_start_pan_y + (int)roundf(dy * sx);
+            if (new_pan_x < 0) new_pan_x = 0;
+            if (new_pan_x > max_x) new_pan_x = max_x;
+            if (new_pan_y < 0) new_pan_y = 0;
+            if (new_pan_y > max_y) new_pan_y = max_y;
+            state->pan_x = new_pan_x;
+            state->pan_y = new_pan_y;
+            ui_present_last_rgb_region(state, state->pan_x, state->pan_y, src_w, src_h);
+        }
+    } else if (btn == 2) {
+        // zoom drag: vertical movement -> zoom factor (drag up = zoom in)
+        float sensitivity = 200.0f; // lower = more sensitive
+        float delta = 1.0f + (float)(-dy) / sensitivity; // negative dy (up) -> >1
+        if (delta < 0.05f) delta = 0.05f;
+        float z = state->mouse_start_zoom * delta;
+        if (z < 0.1f) z = 0.1f;
+        if (z > 10.0f) z = 10.0f;
+        if (camera_has_zoom()) {
+            // convert vertical movement into hardware zoom steps
+            if (dy < -5) camera_zoom_rel(+1.0f);
+            else if (dy > 5) camera_zoom_rel(-1.0f);
+        } else {
+            state->zoom = z;
+            camera_apply_controls(state);
+        }
     }
 }

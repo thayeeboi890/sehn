@@ -28,6 +28,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <cstdlib>
 #include <cstring>
 #include <cerrno>
+#include <climits>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
@@ -49,6 +50,16 @@ struct ControlInfo {
 static ControlInfo pan_ctrl  = {0,0,0,0,false};
 static ControlInfo tilt_ctrl = {0,0,0,0,false};
 static ControlInfo zoom_ctrl = {0,0,0,0,false};
+static ControlInfo exposure_ctrl = {0,0,0,0,false};
+static ControlInfo gain_ctrl = {0,0,0,0,false};
+static ControlInfo wb_ctrl = {0,0,0,0,false};
+static ControlInfo autofocus_ctrl = {0,0,0,0,false};
+
+// cache last set values to avoid hammering device and permission errors
+static long last_exposure_val = LONG_MIN;
+static long last_gain_val = LONG_MIN;
+static long last_wb_val = LONG_MIN;
+static int  last_autofocus_val = INT_MIN;
 
 // last UI values we synced to hardware
 static int  last_pan_x = 0;
@@ -98,6 +109,30 @@ static void camera_probe_controls(int fd) {
                 zoom_ctrl.maximum = qc.maximum;
                 zoom_ctrl.step = qc.step;
                 zoom_ctrl.valid = true;
+            } else if (contains_ci(qc.name, "exposure")) {
+                exposure_ctrl.id = qc.id;
+                exposure_ctrl.minimum = qc.minimum;
+                exposure_ctrl.maximum = qc.maximum;
+                exposure_ctrl.step = qc.step;
+                exposure_ctrl.valid = true;
+            } else if (contains_ci(qc.name, "gain")) {
+                gain_ctrl.id = qc.id;
+                gain_ctrl.minimum = qc.minimum;
+                gain_ctrl.maximum = qc.maximum;
+                gain_ctrl.step = qc.step;
+                gain_ctrl.valid = true;
+            } else if (contains_ci(qc.name, "white") || contains_ci(qc.name, "wb") || contains_ci(qc.name, "balance")) {
+                wb_ctrl.id = qc.id;
+                wb_ctrl.minimum = qc.minimum;
+                wb_ctrl.maximum = qc.maximum;
+                wb_ctrl.step = qc.step;
+                wb_ctrl.valid = true;
+            } else if (contains_ci(qc.name, "focus") && qc.type == V4L2_CTRL_TYPE_BOOLEAN) {
+                autofocus_ctrl.id = qc.id;
+                autofocus_ctrl.minimum = qc.minimum;
+                autofocus_ctrl.maximum = qc.maximum;
+                autofocus_ctrl.step = qc.step;
+                autofocus_ctrl.valid = true;
             }
         }
 
@@ -371,6 +406,61 @@ void camera_zoom_rel(float delta) {
     }
 }
 
+void camera_set_pan_tilt_frac(float pan_frac, float tilt_frac) {
+    if (cam.fd < 0) return;
+    LOG_DEBUG("camera_set_pan_tilt_frac called pan=%.3f tilt=%.3f", (double)pan_frac, (double)tilt_frac);
+    if (pan_ctrl.valid) {
+        if (pan_frac < 0.0f) pan_frac = 0.0f;
+        if (pan_frac > 1.0f) pan_frac = 1.0f;
+        long range = pan_ctrl.maximum - pan_ctrl.minimum;
+        long target = pan_ctrl.minimum + (long)(pan_frac * (float)range);
+        LOG_DEBUG("pan target=%ld (min=%ld max=%ld)", target, pan_ctrl.minimum, pan_ctrl.maximum);
+        struct v4l2_control ctrl = {};
+        ctrl.id = pan_ctrl.id;
+        ctrl.value = (int)target;
+        if (xioctl(cam.fd, VIDIOC_S_CTRL, &ctrl) < 0)
+            perror("VIDIOC_S_CTRL pan_abs");
+    }
+    if (tilt_ctrl.valid) {
+        if (tilt_frac < 0.0f) tilt_frac = 0.0f;
+        if (tilt_frac > 1.0f) tilt_frac = 1.0f;
+        long range = tilt_ctrl.maximum - tilt_ctrl.minimum;
+        long target = tilt_ctrl.minimum + (long)(tilt_frac * (float)range);
+        LOG_DEBUG("tilt target=%ld (min=%ld max=%ld)", target, tilt_ctrl.minimum, tilt_ctrl.maximum);
+        struct v4l2_control ctrl = {};
+        ctrl.id = tilt_ctrl.id;
+        ctrl.value = (int)target;
+        if (xioctl(cam.fd, VIDIOC_S_CTRL, &ctrl) < 0)
+            perror("VIDIOC_S_CTRL tilt_abs");
+    }
+}
+
+void camera_get_pan_tilt_frac(float *pan_frac, float *tilt_frac) {
+    if (pan_frac) *pan_frac = 0.5f;
+    if (tilt_frac) *tilt_frac = 0.5f;
+    if (cam.fd < 0) return;
+    if (pan_ctrl.valid && pan_frac) {
+        struct v4l2_control ctrl = {};
+        ctrl.id = pan_ctrl.id;
+        if (xioctl(cam.fd, VIDIOC_G_CTRL, &ctrl) == 0) {
+            long v = ctrl.value;
+            long range = pan_ctrl.maximum - pan_ctrl.minimum;
+            if (range > 0) *pan_frac = (float)(v - pan_ctrl.minimum) / (float)range;
+            else *pan_frac = 0.5f;
+        }
+    }
+    if (tilt_ctrl.valid && tilt_frac) {
+        struct v4l2_control ctrl = {};
+        ctrl.id = tilt_ctrl.id;
+        if (xioctl(cam.fd, VIDIOC_G_CTRL, &ctrl) == 0) {
+            long v = ctrl.value;
+            long range = tilt_ctrl.maximum - tilt_ctrl.minimum;
+            if (range > 0) *tilt_frac = (float)(v - tilt_ctrl.minimum) / (float)range;
+            else *tilt_frac = 0.5f;
+        }
+    }
+}
+
 void camera_apply_controls(AppState *state) {
     if (cam.fd < 0) return;
     time_t now = time(nullptr);
@@ -451,6 +541,66 @@ void camera_apply_controls(AppState *state) {
             state->notification = "Camera has no zoom control";
             state->notification_until = now + 2;
             last_zoom = state->zoom;
+        }
+    }
+
+    // EXPOSURE (only if changed)
+    if (exposure_ctrl.valid) {
+        long v = (long)state->exposure_time;
+        if (v != last_exposure_val) {
+            struct v4l2_control ctrl = {};
+            ctrl.id = exposure_ctrl.id;
+            ctrl.value = v;
+            if (xioctl(cam.fd, VIDIOC_S_CTRL, &ctrl) < 0) {
+                perror("VIDIOC_S_CTRL exposure");
+            } else {
+                last_exposure_val = v;
+            }
+        }
+    }
+
+    // GAIN (only if changed)
+    if (gain_ctrl.valid) {
+        long v = (long)state->gain;
+        if (v != last_gain_val) {
+            struct v4l2_control ctrl = {};
+            ctrl.id = gain_ctrl.id;
+            ctrl.value = v;
+            if (xioctl(cam.fd, VIDIOC_S_CTRL, &ctrl) < 0) {
+                perror("VIDIOC_S_CTRL gain");
+            } else {
+                last_gain_val = v;
+            }
+        }
+    }
+
+    // WHITE BALANCE / WB TEMP (only if changed)
+    if (wb_ctrl.valid) {
+        long v = (long)state->wb_temp;
+        if (v != last_wb_val) {
+            struct v4l2_control ctrl = {};
+            ctrl.id = wb_ctrl.id;
+            ctrl.value = v;
+            if (xioctl(cam.fd, VIDIOC_S_CTRL, &ctrl) < 0) {
+                perror("VIDIOC_S_CTRL wb");
+            } else {
+                last_wb_val = v;
+            }
+        }
+    }
+
+    // AUTOFOCUS (only if changed)
+    if (autofocus_ctrl.valid) {
+        int v = state->autofocus ? 1 : 0;
+        if (v != last_autofocus_val) {
+            struct v4l2_control ctrl = {};
+            ctrl.id = autofocus_ctrl.id;
+            ctrl.value = v;
+            if (xioctl(cam.fd, VIDIOC_S_CTRL, &ctrl) < 0) {
+                perror("VIDIOC_S_CTRL autofocus");
+            } else {
+                last_autofocus_val = v;
+            }
         }
     }
 }

@@ -114,6 +114,14 @@ struct AppState {
     // --- notifications ---
     std::string notification; /* transient user-visible message */
     time_t      notification_until; /* time when notification expires */
-};
+
+    // --- mouse state ---
+    int  mouse_button;       /* button currently pressed (0 = none) */
+    bool mouse_dragging;     /* true while dragging */
+    int  mouse_down_x, mouse_down_y; /* initial coords */
+    int  mouse_start_pan_x, mouse_start_pan_y; /* pan at drag start */
+    float mouse_start_pan_frac, mouse_start_tilt_frac; /* hardware pan/tilt fractions */
+    float mouse_start_zoom;  /* zoom at drag start */
+    uint64_t mouse_last_hw_update_ms; /* last time hardware PTZ was updated during drag */};
 
 AppState make_default_state();

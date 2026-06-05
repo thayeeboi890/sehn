@@ -43,6 +43,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#include <pthread.h>
 
 struct UIState {
     Display            *dpy;
@@ -52,15 +53,49 @@ struct UIState {
     XImage             *ximg;
     int                 screen;
     bool                shm_available;
-    unsigned char      *rgb_buf;    // converted RGB frame for display
+    unsigned char      *rgb_buf;    // fallback XImage buffer
     size_t              rgb_size;
+    uint8_t            *last_rgb;   // last converted frame (RGB)
+    size_t              last_rgb_size;
+
+    // frame grabber thread
+    pthread_t           frame_thread;
+    pthread_mutex_t     last_rgb_mutex;
+    volatile int        frame_thread_running;
+    volatile int        frame_available;
 };
 
 static UIState ui = {};
 static volatile int ui_shm_error = 0; /* set by X error handler when XShmAttach fails */
 static int ui_shm_error_handler(Display *d, XErrorEvent *ev) { (void)d; (void)ev; ui_shm_error = 1; return 0; }
 
+// forward declarations for converters used by frame thread
+static void yuyv_to_rgb(const uint8_t *yuyv, uint8_t *rgb, uint32_t width, uint32_t height);
+static bool mjpeg_to_rgb(const uint8_t *data, size_t len, uint8_t *rgb, uint32_t width, uint32_t height);
+
+// frame grabber thread: reads raw frames and converts into ui.last_rgb
+static void *frame_thread_func(void *arg) {
+    AppState *s = (AppState *)arg;
+    while (ui.frame_thread_running) {
+        size_t frame_size = 0;
+        const void *frame = camera_next_frame(s, &frame_size);
+        if (!frame) continue;
+        pthread_mutex_lock(&ui.last_rgb_mutex);
+        if (s->v4l2_format == "mjpeg") {
+            mjpeg_to_rgb((const uint8_t *)frame, frame_size, ui.last_rgb, s->width, s->height);
+        } else {
+            yuyv_to_rgb((const uint8_t *)frame, ui.last_rgb, s->width, s->height);
+        }
+        ui.frame_available = 1;
+        pthread_mutex_unlock(&ui.last_rgb_mutex);
+        if (s->recording) capture_video_frame(s, frame, frame_size);
+    }
+    return nullptr;
+}
+
 // ── format conversion ────────────────────────────────────────────────────────
+
+
 
 // YUYV to RGB24
 static void yuyv_to_rgb(const uint8_t *yuyv, uint8_t *rgb,
@@ -173,6 +208,44 @@ static void shm_cleanup() {
 
 static inline uint8_t clamp8(int x) { return x < 0 ? 0 : x > 255 ? 255 : (uint8_t)x; }
 
+static void rgb_to_ximage_region_fast(const uint8_t *rgb,
+                                      uint32_t src_stride, uint32_t src_height,
+                                      int sx, int sy,
+                                      uint32_t sw, uint32_t sh,
+                                      int dst_x, int dst_y,
+                                      uint32_t dst_w, uint32_t dst_h) {
+    uint32_t img_w = (uint32_t)ui.ximg->width;
+    uint32_t img_h = (uint32_t)ui.ximg->height;
+    uint32_t *px = (uint32_t *)ui.ximg->data;
+
+    // clear borders (letterbox/pillarbox) to black where image won't be drawn
+    uint32_t black = 0;
+    if (dst_x > 0 || dst_y > 0 || (uint32_t)(dst_x + dst_w) < img_w || (uint32_t)(dst_y + dst_h) < img_h) {
+        for (uint32_t y = 0; y < img_h; y++) {
+            for (uint32_t x = 0; x < img_w; x++) {
+                if (x < (uint32_t)dst_x || x >= (uint32_t)(dst_x + dst_w) || y < (uint32_t)dst_y || y >= (uint32_t)(dst_y + dst_h))
+                    px[y * img_w + x] = black;
+            }
+        }
+    }
+
+    // nearest-neighbor into destination rectangle (fast)
+    float scale_x = (float)sw / (float)dst_w;
+    float scale_y = (float)sh / (float)dst_h;
+    for (uint32_t dy = 0; dy < dst_h; dy++) {
+        for (uint32_t dx = 0; dx < dst_w; dx++) {
+            uint32_t fx = sx + (uint32_t)((float)dx * scale_x);
+            uint32_t fy = sy + (uint32_t)((float)dy * scale_y);
+            if (fx >= src_stride) fx = src_stride - 1;
+            if (fy >= src_height) fy = src_height - 1;
+            const uint8_t *p = rgb + (fy * src_stride + fx) * 3;
+            px[(dst_y + dy) * img_w + (dst_x + dx)] = ((uint32_t)p[0] << 16) |
+                                                      ((uint32_t)p[1] << 8) |
+                                                      (uint32_t)p[2];
+        }
+    }
+}
+
 static void rgb_to_ximage_region(const uint8_t *rgb,
                                  uint32_t src_stride, uint32_t src_height,
                                  int sx, int sy,
@@ -250,7 +323,48 @@ static void rgb_to_ximage_region(const uint8_t *rgb,
     }
 }
 
+
+// helper to present an RGB frame given a source rect
+static void present_frame_static(AppState *state, uint8_t *frame_rgb,
+                                 uint32_t p_src_w, uint32_t p_src_h,
+                                 int p_src_x, int p_src_y) {
+    if (!frame_rgb) return;
+    int dst_w = state->win_w;
+    int dst_h = state->win_h;
+    float src_aspect = (float)p_src_w / (float)p_src_h;
+    float win_aspect = (float)state->win_w / (float)state->win_h;
+    int dst_img_w, dst_img_h;
+    if (win_aspect > src_aspect) {
+        dst_img_h = state->win_h;
+        dst_img_w = (int)(dst_img_h * src_aspect);
+    } else {
+        dst_img_w = state->win_w;
+        dst_img_h = (int)(dst_img_w / src_aspect);
+    }
+    int dst_x = (state->win_w - dst_img_w) / 2;
+    int dst_y = (state->win_h - dst_img_h) / 2;
+
+    rgb_to_ximage_region(frame_rgb, state->width, state->height,
+                         p_src_x, p_src_y, p_src_w, p_src_h,
+                         dst_x, dst_y, dst_img_w, dst_img_h);
+    if (ui.shm_available)
+        XShmPutImage(ui.dpy, ui.win, ui.gc, ui.ximg, 0, 0, 0, 0, dst_w, dst_h, False);
+    else
+        XPutImage(ui.dpy, ui.win, ui.gc, ui.ximg, 0, 0, 0, 0, dst_w, dst_h);
+    if (state->panel_visible) panel_draw(state, ui.dpy, ui.win, ui.gc);
+    if (state->overlay_visible) overlay_draw(state, ui.dpy, ui.win, ui.gc);
+    XFlush(ui.dpy);
+}
+
 // ── input handling ────────────────────────────────────────────────────────────
+
+void ui_present_last_rgb_region(AppState *state, int src_x, int src_y, uint32_t src_w, uint32_t src_h) {
+    pthread_mutex_lock(&ui.last_rgb_mutex);
+    if (ui.last_rgb && ui.last_rgb_size >= (size_t)src_w * src_h * 3) {
+        present_frame_static(state, ui.last_rgb, (uint32_t)src_w, (uint32_t)src_h, src_x, src_y);
+    }
+    pthread_mutex_unlock(&ui.last_rgb_mutex);
+}
 
 static void handle_key(AppState *state, XKeyEvent *ev) {
     KeySym sym = XLookupKeysym(ev, 0);
@@ -328,7 +442,9 @@ int ui_run(AppState *state) { LOG_FN();
     XStoreName(ui.dpy, ui.win, "sehn");
     XSelectInput(ui.dpy, ui.win,
                  ExposureMask | KeyPressMask |
-                 ButtonPressMask | StructureNotifyMask);
+                 ButtonPressMask | ButtonReleaseMask |
+                 PointerMotionMask |
+                 StructureNotifyMask);
     // grab arrow keys and other special keys so WM doesn't steal them
     XGrabKey(ui.dpy, XKeysymToKeycode(ui.dpy, XK_Left),  AnyModifier, ui.win, True, GrabModeAsync, GrabModeAsync);
     XGrabKey(ui.dpy, XKeysymToKeycode(ui.dpy, XK_Right), AnyModifier, ui.win, True, GrabModeAsync, GrabModeAsync);
@@ -388,87 +504,116 @@ int ui_run(AppState *state) { LOG_FN();
     // intermediate RGB buffer for format conversion
     size_t rgb_sz   = (size_t)state->width * state->height * 3;
     uint8_t *rgb    = (uint8_t *)malloc(rgb_sz);
+    ui.last_rgb = rgb;
+    ui.last_rgb_size = rgb_sz;
+
+    // init frame grabber thread resources
+    pthread_mutex_init(&ui.last_rgb_mutex, nullptr);
+    ui.frame_available = 0;
+    ui.frame_thread_running = 1;
+
+    // start frame grabber thread
+    pthread_create(&ui.frame_thread, nullptr, frame_thread_func, state);
 
     state->running  = true;
     bool prev_fullscreen = state->fullscreen;
 
     while (state->running) {
         signals_dispatch(state);
-        while (XPending(ui.dpy)) {
-            XEvent ev;
-            XNextEvent(ui.dpy, &ev);
-            if (ev.type == KeyPress)
-                input_handle_key(state, km, &ev.xkey);
-            else if (ev.type == ClientMessage) {
-                if ((Atom)ev.xclient.data.l[0] == wm_delete)
-                    state->running = false;
-            } else if (ev.type == ButtonPress) {
-                input_handle_button(state, &ev.xbutton);
-            } else if (ev.type == ConfigureNotify) {
-                int new_win_w = ev.xconfigure.width  - state->panel_width;
-                int new_win_h = ev.xconfigure.height;
 
-                // preserve camera viewport center for manual zoom/pan mode
-                if (state->zoom_mode == ZoomMode::Percent) {
-                    // old source rect
-                    uint32_t old_src_w = (uint32_t)((float)state->width / state->zoom);
-                    uint32_t old_src_h = (uint32_t)((float)state->height / state->zoom);
-                    if (old_src_w > state->width) old_src_w = state->width;
-                    if (old_src_h > state->height) old_src_h = state->height;
-                    int old_src_x = state->pan_x;
-                    int old_src_y = state->pan_y;
-                    float center_x = old_src_x + old_src_w * 0.5f;
-                    float center_y = old_src_y + old_src_h * 0.5f;
+        // wait briefly for X events so UI remains responsive; frame grabbing runs in background thread
+        int xfd = ConnectionNumber(ui.dpy);
+        fd_set rfds;
+        FD_ZERO(&rfds);
+        FD_SET(xfd, &rfds);
+        struct timeval tv = { 0, 20000 }; // 20ms
+        int sel = select(xfd + 1, &rfds, nullptr, nullptr, &tv);
+        if (sel < 0) {
+            perror("select");
+            break;
+        }
 
-                    state->win_w = new_win_w;
-                    state->win_h = new_win_h;
+        // process any X events if available
+        if (FD_ISSET(xfd, &rfds)) {
+            while (XPending(ui.dpy)) {
+                XEvent ev;
+                XNextEvent(ui.dpy, &ev);
+                if (ev.type == KeyPress)
+                    input_handle_key(state, km, &ev.xkey);
+                else if (ev.type == ClientMessage) {
+                    if ((Atom)ev.xclient.data.l[0] == wm_delete)
+                        state->running = false;
+                } else if (ev.type == ButtonPress) {
+                    input_handle_button(state, &ev.xbutton);
+                } else if (ev.type == ButtonRelease) {
+                    input_handle_button_release(state, &ev.xbutton);
+                } else if (ev.type == MotionNotify) {
+                    input_handle_motion(state, &ev.xmotion);
+                } else if (ev.type == ConfigureNotify) {
+                    int new_win_w = ev.xconfigure.width  - state->panel_width;
+                    int new_win_h = ev.xconfigure.height;
 
-                    // new source rect (same zoom)
-                    uint32_t new_src_w = (uint32_t)((float)state->width / state->zoom);
-                    uint32_t new_src_h = (uint32_t)((float)state->height / state->zoom);
-                    if (new_src_w > state->width) new_src_w = state->width;
-                    if (new_src_h > state->height) new_src_h = state->height;
+                    // preserve camera viewport center for manual zoom/pan mode
+                    if (state->zoom_mode == ZoomMode::Percent) {
+                        // old source rect
+                        uint32_t old_src_w = (uint32_t)((float)state->width / state->zoom);
+                        uint32_t old_src_h = (uint32_t)((float)state->height / state->zoom);
+                        if (old_src_w > state->width) old_src_w = state->width;
+                        if (old_src_h > state->height) old_src_h = state->height;
+                        int old_src_x = state->pan_x;
+                        int old_src_y = state->pan_y;
+                        float center_x = old_src_x + old_src_w * 0.5f;
+                        float center_y = old_src_y + old_src_h * 0.5f;
 
-                    state->pan_x = (int)(center_x - new_src_w * 0.5f);
-                    state->pan_y = (int)(center_y - new_src_h * 0.5f);
+                        state->win_w = new_win_w;
+                        state->win_h = new_win_h;
 
-                    int max_x = (int)state->width  - (int)new_src_w;
-                    int max_y = (int)state->height - (int)new_src_h;
-                    if (state->pan_x < 0)      state->pan_x = 0;
-                    if (state->pan_y < 0)      state->pan_y = 0;
-                    if (state->pan_x > max_x)  state->pan_x = max_x;
-                    if (state->pan_y > max_y)  state->pan_y = max_y;
-                } else {
-                    state->win_w = new_win_w;
-                    state->win_h = new_win_h;
-                }
+                        // new source rect (same zoom)
+                        uint32_t new_src_w = (uint32_t)((float)state->width / state->zoom);
+                        uint32_t new_src_h = (uint32_t)((float)state->height / state->zoom);
+                        if (new_src_w > state->width) new_src_w = state->width;
+                        if (new_src_h > state->height) new_src_h = state->height;
 
-                // recreate XImage / shared memory if window size changed
-                if (ui.ximg && (ui.ximg->width != state->win_w || ui.ximg->height != state->win_h)) {
-                    // clean up previous image/shm
-                    shm_cleanup();
+                        state->pan_x = (int)(center_x - new_src_w * 0.5f);
+                        state->pan_y = (int)(center_y - new_src_h * 0.5f);
 
-                    // attempt to re-init XShm with new window size
-                    ui.shm_available = shm_init(state);
-                    if (ui.shm_available) {
-                        // if we previously had a fallback rgb buffer, free it
-                        if (ui.rgb_buf) { free(ui.rgb_buf); ui.rgb_buf = nullptr; ui.rgb_size = 0; }
+                        int max_x = (int)state->width  - (int)new_src_w;
+                        int max_y = (int)state->height - (int)new_src_h;
+                        if (state->pan_x < 0)      state->pan_x = 0;
+                        if (state->pan_y < 0)      state->pan_y = 0;
+                        if (state->pan_x > max_x)  state->pan_x = max_x;
+                        if (state->pan_y > max_y)  state->pan_y = max_y;
                     } else {
-                        LOG_DEBUG("XShm unavailable after resize, falling back to XPutImage");
-                        int screen   = DefaultScreen(ui.dpy);
-                        Visual *vis  = DefaultVisual(ui.dpy, screen);
-                        int depth    = DefaultDepth(ui.dpy, screen);
-                        ui.rgb_size  = (size_t)state->win_w * state->win_h * 4;
-                        ui.rgb_buf   = (unsigned char *)realloc(ui.rgb_buf, ui.rgb_size);
-                        ui.ximg      = XCreateImage(ui.dpy, vis, depth, ZPixmap, 0,
-                                                     (char *)ui.rgb_buf,
-                                                     state->win_w, state->win_h, 32, 0);
+                        state->win_w = new_win_w;
+                        state->win_h = new_win_h;
+                    }
+
+                    // recreate XImage / shared memory if window size changed
+                    if (ui.ximg && (ui.ximg->width != state->win_w || ui.ximg->height != state->win_h)) {
+                        // clean up previous image/shm
+                        shm_cleanup();
+
+                        // attempt to re-init XShm with new window size
+                        ui.shm_available = shm_init(state);
+                        if (ui.shm_available) {
+                            // if we previously had a fallback rgb buffer, free it
+                            if (ui.rgb_buf) { free(ui.rgb_buf); ui.rgb_buf = nullptr; ui.rgb_size = 0; }
+                        } else {
+                            LOG_DEBUG("XShm unavailable after resize, falling back to XPutImage");
+                            int screen   = DefaultScreen(ui.dpy);
+                            Visual *vis  = DefaultVisual(ui.dpy, screen);
+                            int depth    = DefaultDepth(ui.dpy, screen);
+                            ui.rgb_size  = (size_t)state->win_w * state->win_h * 4;
+                            ui.rgb_buf   = (unsigned char *)realloc(ui.rgb_buf, ui.rgb_size);
+                            ui.ximg      = XCreateImage(ui.dpy, vis, depth, ZPixmap, 0,
+                                                         (char *)ui.rgb_buf,
+                                                         state->win_w, state->win_h, 32, 0);
+                        }
                     }
                 }
             }
         }
 
-        // handle fullscreen toggle requests from keys by sending _NET_WM_STATE messages
         if (state->fullscreen != prev_fullscreen) {
             Atom wm_state   = XInternAtom(ui.dpy, "_NET_WM_STATE", False);
             Atom wm_fullscr = XInternAtom(ui.dpy, "_NET_WM_STATE_FULLSCREEN", False);
@@ -485,29 +630,11 @@ int ui_run(AppState *state) { LOG_FN();
             prev_fullscreen = state->fullscreen;
         }
 
-        // grab a frame
-        size_t frame_size = 0;
-        const void *frame = camera_next_frame(state, &frame_size);
-        if (!frame) continue;
-
-        if (state->recording)
-            capture_video_frame(state, frame, frame_size);
-
-        // convert to RGB
-        if (state->v4l2_format == "mjpeg") {
-            mjpeg_to_rgb((const uint8_t *)frame, frame_size,
-                         rgb, state->width, state->height);
-        } else {
-            yuyv_to_rgb((const uint8_t *)frame, rgb,
-                        state->width, state->height);
-        }
-
-        // apply zoom and pan
+        // compute src region for current zoom/pan
         uint32_t src_w, src_h;
         int src_x, src_y;
 
-        if (state->zoom_mode == ZoomMode::Fit ||
-            state->zoom_mode == ZoomMode::Fill) {
+        if (state->zoom_mode == ZoomMode::Fit || state->zoom_mode == ZoomMode::Fill) {
             // fit: scale so the whole frame fits in the window
             float scale_x = (float)state->win_w / (float)state->width;
             float scale_y = (float)state->win_h / (float)state->height;
@@ -541,45 +668,18 @@ int ui_run(AppState *state) { LOG_FN();
             src_y = state->pan_y;
         }
 
-        // push to XImage — only the src region
-        LOG_DEBUG("ximg=%dx%d win=%dx%d src=%ux%u @ %d,%d zoom=%.2f",
-                  ui.ximg->width, ui.ximg->height,
-                  state->win_w, state->win_h,
-                  src_w, src_h, src_x, src_y, state->zoom);
-        // compute destination rectangle preserving aspect ratio of source region
-        int dst_w = state->win_w;
-        int dst_h = state->win_h;
-        float src_aspect = (float)src_w / (float)src_h;
-        float win_aspect = (float)state->win_w / (float)state->win_h;
-        int dst_img_w, dst_img_h;
-        if (win_aspect > src_aspect) {
-            dst_img_h = state->win_h;
-            dst_img_w = (int)(dst_img_h * src_aspect);
-        } else {
-            dst_img_w = state->win_w;
-            dst_img_h = (int)(dst_img_w / src_aspect);
-        }
-        int dst_x = (state->win_w - dst_img_w) / 2;
-        int dst_y = (state->win_h - dst_img_h) / 2;
-
-        rgb_to_ximage_region(rgb, state->width, state->height,
-                             src_x, src_y, src_w, src_h,
-                             dst_x, dst_y, dst_img_w, dst_img_h);
-
-        // blit to window
-        if (ui.shm_available)
-            XShmPutImage(ui.dpy, ui.win, ui.gc, ui.ximg,
-                         0, 0, 0, 0, dst_w, dst_h, False);
-        else
-            XPutImage(ui.dpy, ui.win, ui.gc, ui.ximg,
-                      0, 0, 0, 0, dst_w, dst_h);        
-        if (state->panel_visible)
-            panel_draw(state, ui.dpy, ui.win, ui.gc);
-        if (state->overlay_visible)
-            overlay_draw(state, ui.dpy, ui.win, ui.gc);
-        XFlush(ui.dpy);
+    pthread_mutex_lock(&ui.last_rgb_mutex);
+        if (ui.frame_available) ui.frame_available = 0;
+        if (ui.last_rgb)
+            present_frame_static(state, ui.last_rgb, src_w, src_h, src_x, src_y);
+        pthread_mutex_unlock(&ui.last_rgb_mutex);
 
     }
+
+    // stop frame thread
+    ui.frame_thread_running = 0;
+    pthread_join(ui.frame_thread, nullptr);
+    pthread_mutex_destroy(&ui.last_rgb_mutex);
 
     free(rgb);
     ui_cleanup(state);
