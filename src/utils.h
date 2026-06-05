@@ -22,3 +22,31 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 */
+
+#pragma once
+
+#include "sehn.h"
+
+// log levels
+enum class LogLevel {
+    Info,
+    Warn,
+    Error,
+    Debug,
+};
+
+// Initialize the logger with the app state so it knows verbose/quiet.
+void log_init(AppState *state);
+
+// Log a message at the given level.
+// Info:  printed normally, suppressed by --quiet
+// Warn:  printed to stderr, suppressed by --quiet
+// Error: always printed to stderr
+// Debug: only printed with --verbose
+void sehn_log(LogLevel level, const char *fmt, ...);
+
+// Convenience macros
+#define LOG_INFO(...)  sehn_log(LogLevel::Info,  __VA_ARGS__)
+#define LOG_WARN(...)  sehn_log(LogLevel::Warn,  __VA_ARGS__)
+#define LOG_ERROR(...) sehn_log(LogLevel::Error, __VA_ARGS__)
+#define LOG_DEBUG(...) sehn_log(LogLevel::Debug, __VA_ARGS__)

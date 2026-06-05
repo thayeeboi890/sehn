@@ -37,6 +37,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "camera.h"
 #include "ui.h"
 #include "files.h"
+#include "utils.h"
+
 int main(int argc, char *argv[]) {
     // 1. start with defaults
     AppState state = make_default_state();
@@ -46,6 +48,7 @@ int main(int argc, char *argv[]) {
 
     // 3. parse CLI
     cli_parse(argc, argv, &state);
+    log_init(&state);
 
     // 4. apply theme
     if (!state.theme.empty())

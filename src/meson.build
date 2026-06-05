@@ -17,6 +17,7 @@ sources = files(
   'input.cpp',
   'exif.cpp',
   'video.cpp',
+  'utils.cpp',
 )
 
 executable('sehn',
