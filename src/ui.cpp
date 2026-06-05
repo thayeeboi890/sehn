@@ -317,6 +317,9 @@ int ui_run(AppState *state) {
         const void *frame = camera_next_frame(state, &frame_size);
         if (!frame) continue;
 
+        if (state->recording)
+            capture_video_frame(state, frame, frame_size);
+
         // convert to RGB
         if (state->v4l2_format == "mjpeg") {
             mjpeg_to_rgb((const uint8_t *)frame, frame_size,

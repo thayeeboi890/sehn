@@ -22,3 +22,19 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 */
+
+#pragma once
+
+#include "sehn.h"
+#include <cstddef>
+
+// Open output file and initialize encoder.
+// Returns 0 on success, -1 on failure.
+int video_open(AppState *state, const char *path);
+
+// Encode and write one raw frame.
+// data/size is the raw V4L2 frame (MJPEG or YUYV).
+void video_write_frame(AppState *state, const void *data, size_t size);
+
+// Flush, write trailer, close file.
+void video_close(AppState *state);

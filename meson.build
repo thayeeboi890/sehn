@@ -18,8 +18,12 @@ libcurl_dep  = dependency('libcurl',  required : false)
 v4l2_dep     = dependency('libv4l2',  required : true)
 toml_dep     = dependency('tomlc99',  required : false,
                  fallback : ['tomlc99', 'tomlc99_dep'])
+libav_dep = dependency('libavcodec')
+libavf_dep = dependency('libavformat')
+libavu_dep = dependency('libavutil')
+libavs_dep = dependency('libswscale')
 
-deps = [x11_dep, xext_dep, libjpeg_dep, libpng_dep, v4l2_dep, toml_dep]
+deps = [x11_dep, xext_dep, libjpeg_dep, libpng_dep, v4l2_dep, toml_dep, libav_dep, libavf_dep, libavu_dep, libavs_dep]
 
 if libexif_dep.found()
   deps += libexif_dep

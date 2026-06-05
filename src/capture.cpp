@@ -26,6 +26,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "capture.h"
 #include "camera.h"
 #include "exif.h"
+#include "video.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -254,18 +255,16 @@ void capture_burst(AppState *state) {
 }
 
 int capture_video_start(AppState *state) {
-    (void)state;
-    // TODO: open output file, write container header
-    fprintf(stderr, "sehn: video recording not yet implemented\n");
-    return -1;
+    char path[1024];
+    capture_build_filename(state, path, sizeof(path),
+                           state->video_format.c_str());
+    return video_open(state, path);
 }
 
 void capture_video_frame(AppState *state, const void *frame, size_t frame_size) {
-    (void)state; (void)frame; (void)frame_size;
-    // TODO: encode and write frame to container
+    video_write_frame(state, frame, frame_size);
 }
 
 void capture_video_stop(AppState *state) {
-    (void)state;
-    // TODO: finalize container, close file
+    video_close(state);
 }
