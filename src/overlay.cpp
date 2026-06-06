@@ -24,6 +24,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 #include "overlay.h"
+#include "theme.h"
 #include <X11/Xlib.h>
 #include <cstdio>
 #include <ctime>
@@ -42,8 +43,8 @@ static const char *mode_str(Mode m) {
 void overlay_draw(AppState *state, Display *dpy, Window win, GC gc) {
     if (!state->overlay_visible) return;
 
-    // white text
-    XSetForeground(dpy, gc, 0xFFFFFF);
+    // text color from theme
+    XSetForeground(dpy, gc, current_theme.overlay_text);
 
     char buf[128];
 
@@ -58,17 +59,18 @@ void overlay_draw(AppState *state, Display *dpy, Window win, GC gc) {
 
     // top-left third line: recording indicator
     if (state->recording) {
-        XSetForeground(dpy, gc, 0xFF0000); // red
+        XSetForeground(dpy, gc, current_theme.rec_color); // red-ish from theme
         snprintf(buf, sizeof(buf), "● REC");
         XDrawString(dpy, win, gc, 8, 48, buf, strlen(buf));
-        XSetForeground(dpy, gc, 0xFFFFFF);
+        XSetForeground(dpy, gc, current_theme.overlay_text);
     }
 
     // bottom-left: timestamp
     time_t now = time(nullptr);
     struct tm *tm = localtime(&now);
     strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", tm);
-    XDrawString(dpy, win, gc, 8, state->win_h - 8, buf, strlen(buf));
+    int margin = current_theme.overlay_margin > 0 ? current_theme.overlay_margin : 8;
+    XDrawString(dpy, win, gc, margin, state->win_h - margin, buf, strlen(buf));
 
     // center: transient notification (if any)
     if (!state->notification.empty()) {

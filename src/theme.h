@@ -1,24 +1,47 @@
-/* theme.h
+#pragma once
 
-Copyright (C) 2026 Santiago Silva.
+#include <cstdint>
+#include <string>
+#include "sehn.h"
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to
-deal in the Software without restriction, including without limitation the
-rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
-sell copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+// Theme colors and full styling used by UI modules.
+struct Theme {
+    uint32_t background;     // fallback background color (0xRRGGBB)
+    uint32_t foreground;     // default text color
 
-The above copyright notice and this permission notice shall be included in
-all copies of the Software and its documentation and acknowledgment shall be
-given in the documentation and software packages that this Software was
-used.
+    // panel styles
+    uint32_t panel_bg;       // panel background
+    uint32_t panel_separator;// panel separator line
+    uint32_t button_bg;      // panel button background
+    uint32_t button_border;  // button border
+    uint32_t button_text;    // button label color
+    int      panel_padding;  // inner padding for panel
+    int      panel_button_size; // preferred button size (square)
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+    // overlay styles
+    uint32_t overlay_text;   // overlay text
+    uint32_t rec_color;      // recording indicator color
+    int      overlay_font_size;
+    int      overlay_margin;
 
-*/
+    // icons (optional)
+    std::string icon_menu;
+    std::string icon_mode;
+    std::string icon_shutter;
+
+    // scale (for HiDPI support)
+    float    dpi_scale;
+
+    std::string font;        // font name
+};
+
+// Current loaded theme (defaults provided)
+extern Theme current_theme;
+
+// Load and apply a named theme from ~/.config/sehn/themes.toml (or provided dir via XDG).
+// Returns 0 on success, -1 on failure.
+int theme_apply(AppState *state, const char *theme_name);
+
+// Parse a CSS-style or hex color string such as "#rrggbb" or "0xrrggbb".
+// Returns 0 on parse error.
+uint32_t theme_parse_color(const char *s);

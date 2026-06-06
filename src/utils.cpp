@@ -24,15 +24,39 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 #include "utils.h"
+#include "theme.h"
+#include "theme.h"
 #include <cstdio>
 #include <cstdarg>
 #include <ctime>
 #include <mutex>
 
+// define current_theme here so it's linked into the final binary (theme.cpp
+// may be optional in the build system). Values mirror theme.cpp defaults.
+Theme current_theme = {
+    0x000000, // background
+    0xFFFFFF, // foreground
+    0x1a1a1a, // panel_bg
+    0x444444, // panel_separator
+    0x222222, // button_bg
+    0x666666, // button_border
+    0xFFFFFF, // button_text
+    8,        // panel_padding
+    56,       // panel_button_size
+    0xFFFFFF, // overlay_text
+    0xFF0000, // rec_color
+    12,       // overlay_font_size
+    8,        // overlay_margin
+    std::string(), // icon_menu
+    std::string(), // icon_mode
+    std::string(), // icon_shutter
+    1.0f,     // dpi_scale
+    "fixed"  // font
+};
+
 static bool g_verbose = false;
 static bool g_quiet   = false;
 static std::mutex g_log_mutex;
-
 void log_init(AppState *state) {
     g_verbose = state->verbose;
     g_quiet   = state->quiet;

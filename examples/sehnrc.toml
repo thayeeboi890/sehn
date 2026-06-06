@@ -22,6 +22,7 @@ burst_count     = 10
 burst_interval  = 100
 
 [ui]
+theme         = "dark"
 mode          = "photo"
 fullscreen    = false
 borderless    = false

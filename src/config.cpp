@@ -24,6 +24,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 #include "config.h"
+#include "theme.h"
 extern "C" {
 #include "../subprojects/tomlc99/toml.h"
 }
@@ -131,6 +132,8 @@ int config_load(AppState *state, const char *path) { LOG_FN();
         state->hide_pointer    = toml_bool(ui, "hide_pointer",  state->hide_pointer);
         state->win_w           = toml_int(ui,  "window_width",  state->win_w);
         state->win_h           = toml_int(ui,  "window_height", state->win_h);
+        // optional theme name to auto-apply via config
+        state->theme           = toml_str(ui, "theme", state->theme);
 
         std::string mode = toml_str(ui, "mode", "");
         if      (mode == "photo")   state->mode = Mode::Photo;
@@ -151,7 +154,12 @@ int config_apply_theme(AppState *state, const char *theme_name) { LOG_FN();
     p = p.substr(0, slash) + "/themes.toml";
 
     FILE *fp = fopen(p.c_str(), "r");
-    if (!fp) return -1;
+    if (!fp) {
+        // fallback to examples/themes.toml in repo (useful during development)
+        fp = fopen("./examples/themes.toml", "r");
+        if (!fp) fp = fopen("../examples/themes.toml", "r");
+        if (!fp) return -1;
+    }
 
     char errbuf[256];
     toml_table_t *root = toml_parse_file(fp, errbuf, sizeof(errbuf));
@@ -185,6 +193,9 @@ int config_apply_theme(AppState *state, const char *theme_name) { LOG_FN();
         state->borderless    = toml_bool(ui, "borderless", state->borderless);
         state->overlay_visible = toml_bool(ui, "overlay",  state->overlay_visible);
     }
+
+    // apply visual theme (populate current_theme via theme_apply)
+    theme_apply(state, theme_name);
 
     toml_free(root);
     return 0;

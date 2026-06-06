@@ -1,0 +1,49 @@
+[dark]
+[dark.ui]
+background = "#000000"
+foreground = "#ffffff"
+panel_bg = "#1a1a1a"
+panel_separator = "#444444"
+button_bg = "#222222"
+button_border = "#666666"
+button_text = "#ffffff"
+panel_padding = 8
+panel_button_size = 56
+overlay_text = "#ffffff"
+rec_color = "#ff0000"
+overlay_font_size = 12
+overlay_margin = 8
+font = "fixed"
+
+[dark.ui.icons]
+menu = ""
+mode = ""
+shutter = ""
+
+[dark.variants.compact]
+[dark.variants.compact.ui]
+panel_padding = 4
+panel_button_size = 40
+overlay_font_size = 10
+
+[light]
+[light.ui]
+background = "#ffffff"
+foreground = "#000000"
+panel_bg = "#f0f0f0"
+panel_separator = "#cccccc"
+button_bg = "#e0e0e0"
+button_border = "#888888"
+button_text = "#000000"
+panel_padding = 8
+panel_button_size = 56
+overlay_text = "#000000"
+rec_color = "#ff0000"
+overlay_font_size = 12
+overlay_margin = 8
+font = "fixed"
+
+[light.ui.icons]
+menu = ""
+mode = ""
+shutter = ""

@@ -24,6 +24,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 #include "panel.h"
+#include "theme.h"
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
 #include <cstdio>
@@ -39,15 +40,15 @@ static void draw_button(Display *dpy, Window win, GC gc,
                          int x, int y, int w, int h,
                          const char *label, bool active) {
     // background
-    XSetForeground(dpy, gc, active ? 0x444444 : 0x222222);
+    XSetForeground(dpy, gc, active ? current_theme.button_bg : current_theme.button_bg);
     XFillRectangle(dpy, win, gc, x, y, w, h);
 
     // border
-    XSetForeground(dpy, gc, 0x666666);
+    XSetForeground(dpy, gc, current_theme.button_border);
     XDrawRectangle(dpy, win, gc, x, y, w - 1, h - 1);
 
     // label centered (approximate — no font metrics, just eyeball it)
-    XSetForeground(dpy, gc, 0xFFFFFF);
+    XSetForeground(dpy, gc, current_theme.button_text);
     int lx = x + (w - (int)strlen(label) * 6) / 2;
     int ly = y + h / 2 + 4;
     XDrawString(dpy, win, gc, lx, ly, label, strlen(label));
@@ -71,26 +72,33 @@ void panel_draw(AppState *state, Display *dpy, Window win, GC gc) {
     int px = state->win_w;              // panel x offset (right of viewfinder)
     int bw = pw - 4;                    // button width
     int bh = pw - 4;                    // button height (square)
+    // if theme provides a preferred button size, use that (clamped to panel width)
+    if (current_theme.panel_button_size > 0) {
+        bh = current_theme.panel_button_size;
+        if (bh > pw - 4) bh = pw - 4;
+        bw = bh;
+    }
+    int pad = current_theme.panel_padding > 0 ? current_theme.panel_padding : 4;
 
     // panel background
-    XSetForeground(dpy, gc, 0x1a1a1a);
+    XSetForeground(dpy, gc, current_theme.panel_bg);
     XFillRectangle(dpy, win, gc, px, 0, pw, ph);
 
     // separator line between viewfinder and panel
-    XSetForeground(dpy, gc, 0x444444);
+    XSetForeground(dpy, gc, current_theme.panel_separator);
     XDrawLine(dpy, win, gc, px, 0, px, ph);
 
     // ── hamburger menu — top ─────────────────────────────────────────────────
-    draw_button(dpy, win, gc, px + 2, 4, bw, bh, "=", false);
+    draw_button(dpy, win, gc, px + pad, pad, bw, bh, "=", false);
 
     // ── mode button — middle ─────────────────────────────────────────────────
     int mid_y = ph / 2 - bh / 2;
-    draw_button(dpy, win, gc, px + 2, mid_y, bw, bh,
+    draw_button(dpy, win, gc, px + pad, mid_y, bw, bh,
                 mode_short(state->mode), false);
 
     // ── shutter button — bottom ──────────────────────────────────────────────
-    int bot_y = ph - bh - 4;
-    draw_button(dpy, win, gc, px + 2, bot_y, bw, bh,
+    int bot_y = ph - bh - pad;
+    draw_button(dpy, win, gc, px + pad, bot_y, bw, bh,
                 state->recording ? "■" : "●", state->recording);
 }
 

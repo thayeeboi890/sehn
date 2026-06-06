@@ -51,8 +51,10 @@ int main(int argc, char *argv[]) { LOG_FN();
     log_init(&state);
 
     // 4. apply theme
-    if (!state.theme.empty())
+    if (!state.theme.empty()) {
+        LOG_DEBUG("applying theme: %s", state.theme.c_str());
         config_apply_theme(&state, state.theme.c_str());
+    }
 
     // 5. early-exit commands
     if (state.list_devices_and_exit)
