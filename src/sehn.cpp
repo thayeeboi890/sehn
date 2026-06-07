@@ -74,6 +74,6 @@ AppState make_default_state() {
     s.verbose           = false;
     s.quiet             = false;
     s.running           = true;
-
+    s.notification_until = 0;
     return s;
 }

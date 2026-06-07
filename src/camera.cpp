@@ -51,6 +51,7 @@ static ControlInfo pan_ctrl  = {0,0,0,0,false};
 static ControlInfo tilt_ctrl = {0,0,0,0,false};
 static ControlInfo zoom_ctrl = {0,0,0,0,false};
 static ControlInfo exposure_ctrl = {0,0,0,0,false};
+static ControlInfo exposure_auto_ctrl = {0,0,0,0,false};
 static ControlInfo gain_ctrl = {0,0,0,0,false};
 static ControlInfo wb_ctrl = {0,0,0,0,false};
 static ControlInfo autofocus_ctrl = {0,0,0,0,false};
@@ -89,8 +90,8 @@ static void camera_probe_controls(int fd) {
             qc.id |= V4L2_CTRL_FLAG_NEXT_CTRL | V4L2_CTRL_FLAG_NEXT_COMPOUND;
             continue;
         }
+         if (qc.type == V4L2_CTRL_TYPE_INTEGER || qc.type == V4L2_CTRL_TYPE_BOOLEAN || qc.type == V4L2_CTRL_TYPE_MENU) {
 
-        if (qc.type == V4L2_CTRL_TYPE_INTEGER || qc.type == V4L2_CTRL_TYPE_BOOLEAN) {
             if (contains_ci(qc.name, "pan")) {
                 pan_ctrl.id = qc.id;
                 pan_ctrl.minimum = qc.minimum;
@@ -109,12 +110,18 @@ static void camera_probe_controls(int fd) {
                 zoom_ctrl.maximum = qc.maximum;
                 zoom_ctrl.step = qc.step;
                 zoom_ctrl.valid = true;
-            } else if (contains_ci(qc.name, "exposure")) {
-                exposure_ctrl.id = qc.id;
+            } else if (qc.id == V4L2_CID_EXPOSURE_ABSOLUTE) {
+                exposure_ctrl.id      = qc.id;
                 exposure_ctrl.minimum = qc.minimum;
                 exposure_ctrl.maximum = qc.maximum;
-                exposure_ctrl.step = qc.step;
-                exposure_ctrl.valid = true;
+                exposure_ctrl.step    = qc.step;
+                exposure_ctrl.valid   = true;
+            } else if (qc.id == V4L2_CID_EXPOSURE_AUTO) {
+                exposure_auto_ctrl.id      = qc.id;
+                exposure_auto_ctrl.minimum = qc.minimum;
+                exposure_auto_ctrl.maximum = qc.maximum;
+                exposure_auto_ctrl.step    = qc.step;
+                exposure_auto_ctrl.valid   = true;
             } else if (contains_ci(qc.name, "gain")) {
                 gain_ctrl.id = qc.id;
                 gain_ctrl.minimum = qc.minimum;
@@ -462,7 +469,9 @@ void camera_get_pan_tilt_frac(float *pan_frac, float *tilt_frac) {
 }
 
 void camera_apply_controls(AppState *state) {
-    if (cam.fd < 0) return;
+    LOG_DEBUG("exposure_ctrl valid=%d id=0x%x min=%ld max=%ld",
+              exposure_ctrl.valid, exposure_ctrl.id,
+              exposure_ctrl.minimum, exposure_ctrl.maximum);    if (cam.fd < 0) return;
     time_t now = time(nullptr);
 
     // For legacy behavior (state-based), fall back to the previous implementation
@@ -544,18 +553,27 @@ void camera_apply_controls(AppState *state) {
         }
     }
 
-    // EXPOSURE (only if changed)
-    if (exposure_ctrl.valid) {
+    // EXPOSURE MODE — must be set before exposure time
+    if (exposure_auto_ctrl.valid) {
+        struct v4l2_control ctrl = {};
+        ctrl.id    = exposure_auto_ctrl.id;
+        ctrl.value = (state->exposure_mode == "manual") ? 1 : 3;
+        xioctl(cam.fd, VIDIOC_S_CTRL, &ctrl);
+        if (state->exposure_mode != "manual")
+            last_exposure_val = LONG_MIN;
+    }
+
+    // EXPOSURE TIME — only when manual
+    if (exposure_ctrl.valid && state->exposure_mode == "manual") {
         long v = (long)state->exposure_time;
         if (v != last_exposure_val) {
             struct v4l2_control ctrl = {};
-            ctrl.id = exposure_ctrl.id;
-            ctrl.value = v;
-            if (xioctl(cam.fd, VIDIOC_S_CTRL, &ctrl) < 0) {
+            ctrl.id    = exposure_ctrl.id;
+            ctrl.value = (int)v;
+            if (xioctl(cam.fd, VIDIOC_S_CTRL, &ctrl) < 0)
                 perror("VIDIOC_S_CTRL exposure");
-            } else {
+            else
                 last_exposure_val = v;
-            }
         }
     }
 
@@ -574,18 +592,25 @@ void camera_apply_controls(AppState *state) {
         }
     }
 
-    // WHITE BALANCE / WB TEMP (only if changed)
-    if (wb_ctrl.valid) {
+    // AUTO WHITE BALANCE toggle
+    {
+        struct v4l2_control ctrl = {};
+        ctrl.id    = V4L2_CID_AUTO_WHITE_BALANCE;
+        ctrl.value = (state->wb_mode == "auto") ? 1 : 0;
+        xioctl(cam.fd, VIDIOC_S_CTRL, &ctrl);
+    }
+
+    // WHITE BALANCE TEMP — only when manual
+    if (wb_ctrl.valid && state->wb_mode == "manual") {
         long v = (long)state->wb_temp;
         if (v != last_wb_val) {
             struct v4l2_control ctrl = {};
-            ctrl.id = wb_ctrl.id;
+            ctrl.id    = wb_ctrl.id;
             ctrl.value = v;
-            if (xioctl(cam.fd, VIDIOC_S_CTRL, &ctrl) < 0) {
+            if (xioctl(cam.fd, VIDIOC_S_CTRL, &ctrl) < 0)
                 perror("VIDIOC_S_CTRL wb");
-            } else {
+            else
                 last_wb_val = v;
-            }
         }
     }
 
