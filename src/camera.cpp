@@ -321,11 +321,10 @@ const void *camera_next_frame(AppState *state, size_t *out_size) { LOG_FN();
     buf.memory = V4L2_MEMORY_MMAP;
 
     if (xioctl(cam.fd, VIDIOC_DQBUF, &buf) < 0) {
+        if (errno == EAGAIN) return nullptr;
         perror("VIDIOC_DQBUF");
         return nullptr;
-    }
-
-    *out_size = buf.bytesused;
+    }    *out_size = buf.bytesused;
     const void *data = cam.buffers[buf.index].start;
 
     // re-enqueue immediately

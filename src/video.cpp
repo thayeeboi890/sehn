@@ -50,9 +50,12 @@ struct VideoState {
     SwsContext       *sws_ctx;
     int64_t           pts;
     bool              open;
+    struct            timespec start_ts;
+    int64_t last_pts;
 };
 
 static VideoState vid = {};
+bool vid_is_open() { return vid.open; }
 
 // YUYV -> AVFrame (YUV420P)
 static void yuyv_to_yuv420(const uint8_t *yuyv, AVFrame *frame,
@@ -164,6 +167,7 @@ int video_open(AppState *state, const char *path) { LOG_FN();
         SWS_BILINEAR, nullptr, nullptr, nullptr);
 
     vid.pts  = 0;
+    vid.last_pts = -1;
     vid.open = true;
     LOG_INFO("recording to %s", path);
     return 0;
@@ -206,8 +210,27 @@ void video_write_frame(AppState *state, const void *data, size_t size) { LOG_FN(
         free(rgb);
     }
 
-    vid.frame->pts = vid.pts++;
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    if (vid.last_pts < 0) {
+        vid.start_ts = ts;
+    }
 
+    int64_t elapsed_ms = (int64_t)(ts.tv_sec - vid.start_ts.tv_sec) * 1000LL +
+                         (int64_t)(ts.tv_nsec - vid.start_ts.tv_nsec) / 1000000LL;
+
+// convert elapsed time to codec timebase
+vid.frame->pts = av_rescale_q(
+    elapsed_ms,
+    AVRational{1, 1000},
+    vid.codec_ctx->time_base);
+
+// enforce strictly increasing PTS
+if (vid.frame->pts <= vid.last_pts)
+    vid.frame->pts = vid.last_pts + 1;
+
+vid.last_pts = vid.frame->pts;
+vid.pts++;
     // encode
     avcodec_send_frame(vid.codec_ctx, vid.frame);
     while (avcodec_receive_packet(vid.codec_ctx, vid.pkt) == 0) {

@@ -33,6 +33,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <cstdio>
 #include <cmath>
 #include <time.h>
+#include <unistd.h>
 
 static void do_action(AppState *state, Action action) {
     switch (action) {
@@ -46,8 +47,18 @@ static void do_action(AppState *state, Action action) {
             if (state->mode == Mode::Burst)
                 capture_burst(state);
             else if (state->mode == Mode::Video) {
-                if (!state->recording) { capture_video_start(state); state->recording = true; }
-                else                   { capture_video_stop(state);  state->recording = false; }
+if (!state->recording) {
+    capture_video_start(state);
+    state->recording = true;
+}
+else {
+    state->recording = false;
+
+    // allow capture thread to finish current frame
+    usleep(50000);
+
+    capture_video_stop(state);
+}
             } else {
                 capture_photo(state, f, fsz);
             }

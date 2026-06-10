@@ -38,3 +38,6 @@ void video_write_frame(AppState *state, const void *data, size_t size);
 
 // Flush, write trailer, close file.
 void video_close(AppState *state);
+
+// return true if video is currently open (recording)
+bool vid_is_open();

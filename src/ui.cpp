@@ -30,10 +30,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "capture.h"
 #include "input.h"
 #include "signals.h"
+#include "video.h"
 
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <unistd.h>
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
@@ -88,7 +90,7 @@ static void *frame_thread_func(void *arg) {
         }
         ui.frame_available = 1;
         pthread_mutex_unlock(&ui.last_rgb_mutex);
-        if (s->recording) capture_video_frame(s, frame, frame_size);
+        if (s->recording && vid_is_open()) capture_video_frame(s, frame, frame_size);
     }
     return nullptr;
 }
@@ -385,8 +387,10 @@ static void handle_key(AppState *state, XKeyEvent *ev) {
                     capture_video_start(state);
                     state->recording = true;
                 } else {
-                    capture_video_stop(state);
                     state->recording = false;
+                    usleep(50000);   
+                    capture_video_stop(state);
+
                 }
             } else {
                 capture_photo(state, frame, frame_size);
