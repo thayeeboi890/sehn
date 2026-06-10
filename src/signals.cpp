@@ -26,6 +26,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "signals.h"
 #include "capture.h"
 #include "camera.h"
+#include "config.h"
+#include "utils.h"
 #include <csignal>
 #include <cstdio>
 
@@ -66,7 +68,11 @@ void signals_dispatch(AppState *state) {
 
     if (state->sig_reload_config) {
         state->sig_reload_config = false;
-        // TODO: call config_load once config.h is fully wired
-        printf("sehn: SIGHUP received, config reload not yet implemented\n");
+        LOG_INFO("reloading config");
+        const char *path = state->config_path.empty() ? nullptr : state->config_path.c_str();
+        config_load(state, path);
+        if (!state->theme.empty())
+            config_apply_theme(state, state->theme.c_str());
+        camera_apply_controls(state);
     }
 }
