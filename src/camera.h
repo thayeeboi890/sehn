@@ -29,33 +29,33 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <linux/videodev2.h>
 
 struct CameraBuffer {
-    void   *start;
-    size_t  length;
+    void* start;
+    size_t length;
 };
 
 struct CameraState {
-    int              fd;
-    CameraBuffer    *buffers;
-    unsigned int     n_buffers;
+    int fd;
+    CameraBuffer* buffers;
+    unsigned int n_buffers;
     struct v4l2_format fmt;
-    bool             streaming;
+    bool streaming;
 };
 
-int         camera_open(AppState *state);
-int         camera_start(AppState *state);
-const void *camera_next_frame(AppState *state, size_t *out_size);
-void        camera_stop(AppState *state);
-void        camera_close(AppState *state);
-void        camera_apply_controls(AppState *state);
+int camera_open(AppState* state);
+int camera_start(AppState* state);
+const void* camera_next_frame(AppState* state, size_t* out_size);
+void camera_stop(AppState* state);
+void camera_close(AppState* state);
+void camera_apply_controls(AppState* state);
 
-bool        camera_has_pan();
-bool        camera_has_tilt();
-bool        camera_has_zoom();
+bool camera_has_pan();
+bool camera_has_tilt();
+bool camera_has_zoom();
 
-void        camera_pan_rel(int dx, int dy); /* dx/dy in UI-pan steps (±1) */
-void        camera_zoom_rel(float delta); /* delta is zoom multiplier delta */
+void camera_pan_rel(int dx, int dy); /* dx/dy in UI-pan steps (±1) */
+void camera_zoom_rel(float delta);   /* delta is zoom multiplier delta */
 
 /* Set absolute pan/tilt as fractions 0.0..1.0 of their ranges */
-void        camera_set_pan_tilt_frac(float pan_frac, float tilt_frac);
-void        camera_get_pan_tilt_frac(float *pan_frac, float *tilt_frac);
-int         camera_negotiate(AppState *state);
+void camera_set_pan_tilt_frac(float pan_frac, float tilt_frac);
+void camera_get_pan_tilt_frac(float* pan_frac, float* tilt_frac);
+int camera_negotiate(AppState* state);

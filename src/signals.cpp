@@ -24,40 +24,49 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 #include "signals.h"
-#include "capture.h"
 #include "camera.h"
+#include "capture.h"
 #include "config.h"
 #include "utils.h"
 #include <csignal>
 #include <cstdio>
 
-static AppState *g_state = nullptr;
+static AppState* g_state = nullptr;
 
-static void handle_sigusr1(int) {
-    if (g_state) g_state->sig_capture = true;
+static void handle_sigusr1(int)
+{
+    if (g_state)
+        g_state->sig_capture = true;
 }
 
-static void handle_sigusr2(int) {
-    if (g_state) g_state->sig_next_mode = true;
+static void handle_sigusr2(int)
+{
+    if (g_state)
+        g_state->sig_next_mode = true;
 }
 
-static void handle_sighup(int) {
-    if (g_state) g_state->sig_reload_config = true;
+static void handle_sighup(int)
+{
+    if (g_state)
+        g_state->sig_reload_config = true;
 }
 
-void signals_init(AppState *state) {
+void signals_init(AppState* state)
+{
     g_state = state;
     std::signal(SIGUSR1, handle_sigusr1);
     std::signal(SIGUSR2, handle_sigusr2);
-    std::signal(SIGHUP,  handle_sighup);
+    std::signal(SIGHUP, handle_sighup);
 }
 
-void signals_dispatch(AppState *state) {
+void signals_dispatch(AppState* state)
+{
     if (state->sig_capture) {
         state->sig_capture = false;
         size_t fsz = 0;
-        const void *f = camera_next_frame(state, &fsz);
-        if (f) capture_photo(state, f, fsz);
+        const void* f = camera_next_frame(state, &fsz);
+        if (f)
+            capture_photo(state, f, fsz);
     }
 
     if (state->sig_next_mode) {
@@ -69,7 +78,7 @@ void signals_dispatch(AppState *state) {
     if (state->sig_reload_config) {
         state->sig_reload_config = false;
         LOG_INFO("reloading config");
-        const char *path = state->config_path.empty() ? nullptr : state->config_path.c_str();
+        const char* path = state->config_path.empty() ? nullptr : state->config_path.c_str();
         config_load(state, path);
         if (!state->theme.empty())
             config_apply_theme(state, state->theme.c_str());

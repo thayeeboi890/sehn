@@ -31,8 +31,8 @@ int list_devices();
 
 // List all formats, resolutions, and framerates for a given device.
 // Returns 0 on success, 1 if device could not be opened.
-int list_formats(const char *device);
+int list_formats(const char* device);
 
 // List all V4L2 controls and their current values for a given device.
 // Returns 0 on success, 1 if device could not be opened.
-int list_controls(const char *device);
+int list_controls(const char* device);

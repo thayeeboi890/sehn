@@ -15,4 +15,4 @@ PointerAlignment: Left
 SortIncludes: true
 IncludeBlocks: Preserve
 ReflowComments: true
-Standard: Cpp17
+Standard: c++17

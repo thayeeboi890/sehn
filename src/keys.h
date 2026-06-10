@@ -70,10 +70,10 @@ using KeyMap = std::unordered_map<KeySym, Action>;
 
 // Load keybindings from ~/.config/sehn/keys.toml.
 // Falls back to defaults if file not found.
-KeyMap keys_load(AppState *state);
+KeyMap keys_load(AppState* state);
 
 // Return the default keybindings.
 KeyMap keys_defaults();
 
 // Look up which action a KeySym maps to.
-Action keys_lookup(const KeyMap &km, KeySym sym);
+Action keys_lookup(const KeyMap& km, KeySym sym);

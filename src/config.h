@@ -30,11 +30,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 // Load config from file into state.
 // If path is nullptr, use default XDG path (~/.config/sehn/sehnrc.toml).
 // Returns 0 on success, -1 if file not found (non-fatal), -2 on parse error.
-int config_load(AppState *state, const char *path);
+int config_load(AppState* state, const char* path);
 
 // Apply a named theme from themes.toml on top of current state.
 // Returns 0 on success, -1 if theme not found.
-int config_apply_theme(AppState *state, const char *theme_name);
+int config_apply_theme(AppState* state, const char* theme_name);
 
 // Dump the resolved config to stdout as TOML (for --print-config).
-void config_print(const AppState *state);
+void config_print(const AppState* state);

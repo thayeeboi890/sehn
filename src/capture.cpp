@@ -26,24 +26,24 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "capture.h"
 #include "camera.h"
 #include "exif.h"
-#include "video.h"
 #include "utils.h"
+#include "video.h"
 
+#include <cerrno>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
-#include <cerrno>
 
-#include <unistd.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #include <jpeglib.h>
 #include <png.h>
 
 #ifdef HAVE_LIBEXIF
-#include <libexif/exif-data.h>
 #include "utils.h"
+#include <libexif/exif-data.h>
 #endif
 
 // session capture counter, resets each run
@@ -51,46 +51,51 @@ static int session_counter = 0;
 
 // ── filename builder ──────────────────────────────────────────────────────────
 
-void capture_build_filename(AppState *state, char *buf, size_t buf_len,
-                             const char *ext) { LOG_FN();
+void capture_build_filename(AppState* state, char* buf, size_t buf_len, const char* ext)
+{
+    LOG_FN();
     // expand strftime tokens first
     time_t now = time(nullptr);
-    struct tm *tm = localtime(&now);
+    struct tm* tm = localtime(&now);
 
     char time_part[256];
-    strftime(time_part, sizeof(time_part),
-             state->filename_pattern.c_str(), tm);
+    strftime(time_part, sizeof(time_part), state->filename_pattern.c_str(), tm);
 
     // replace %c with zero-padded session counter
     char with_counter[512];
     char counter_str[16];
     snprintf(counter_str, sizeof(counter_str), "%04d", session_counter++);
-    const char *p = time_part;
-    char *out = with_counter;
+    const char* p = time_part;
+    char* out = with_counter;
     while (*p && out < with_counter + sizeof(with_counter) - 1) {
         if (p[0] == '#' && p[1] == '#') {
-            const char *c = counter_str;
-            while (*c) *out++ = *c++;
+            const char* c = counter_str;
+            while (*c)
+                *out++ = *c++;
             p += 2;
-        } else {
+        }
+        else {
             *out++ = *p++;
         }
     }
     *out = '\0';
 
-    snprintf(buf, buf_len, "%s/%s.%s",
-             state->output_dir.c_str(), with_counter, ext);
+    snprintf(buf, buf_len, "%s/%s.%s", state->output_dir.c_str(), with_counter, ext);
 }
 
 // ── JPEG save ────────────────────────────────────────────────────────────────
 
-static int save_jpeg(AppState *state, const uint8_t *rgb,
-                     uint32_t width, uint32_t height) { LOG_FN();
+static int save_jpeg(AppState* state, const uint8_t* rgb, uint32_t width, uint32_t height)
+{
+    LOG_FN();
     char path[1024];
     capture_build_filename(state, path, sizeof(path), "jpg");
 
-    FILE *fp = fopen(path, "wb");
-    if (!fp) { perror("fopen"); return -1; }
+    FILE* fp = fopen(path, "wb");
+    if (!fp) {
+        perror("fopen");
+        return -1;
+    }
 
     struct jpeg_compress_struct cinfo;
     struct jpeg_error_mgr jerr;
@@ -98,60 +103,62 @@ static int save_jpeg(AppState *state, const uint8_t *rgb,
     jpeg_create_compress(&cinfo);
     jpeg_stdio_dest(&cinfo, fp);
 
-    cinfo.image_width      = width;
-    cinfo.image_height     = height;
+    cinfo.image_width = width;
+    cinfo.image_height = height;
     cinfo.input_components = 3;
-    cinfo.in_color_space   = JCS_RGB;
+    cinfo.in_color_space = JCS_RGB;
     jpeg_set_defaults(&cinfo);
     jpeg_set_quality(&cinfo, state->jpeg_quality, TRUE);
     jpeg_start_compress(&cinfo, TRUE);
 
     uint32_t row_stride = width * 3;
     while (cinfo.next_scanline < height) {
-        const uint8_t *row = rgb + cinfo.next_scanline * row_stride;
+        const uint8_t* row = rgb + cinfo.next_scanline * row_stride;
         jpeg_write_scanlines(&cinfo, (JSAMPARRAY)&row, 1);
     }
 
     jpeg_finish_compress(&cinfo);
     jpeg_destroy_compress(&cinfo);
     fclose(fp);
-    #ifdef HAVE_LIBEXIF
-      exif_write(state, path);
-    #endif
+#ifdef HAVE_LIBEXIF
+    exif_write(state, path);
+#endif
     LOG_INFO("saved %s", path);
     return 0;
 }
 
 // ── PNG save ─────────────────────────────────────────────────────────────────
 
-static int save_png(AppState *state, const uint8_t *rgb,
-                    uint32_t width, uint32_t height) { LOG_FN();
+static int save_png(AppState* state, const uint8_t* rgb, uint32_t width, uint32_t height)
+{
+    LOG_FN();
     char path[1024];
     capture_build_filename(state, path, sizeof(path), "png");
 
-    FILE *fp = fopen(path, "wb");
-    if (!fp) { perror("fopen"); return -1; }
+    FILE* fp = fopen(path, "wb");
+    if (!fp) {
+        perror("fopen");
+        return -1;
+    }
 
-    png_structp png = png_create_write_struct(PNG_LIBPNG_VER_STRING,
-                                               nullptr, nullptr, nullptr);
-    png_infop info  = png_create_info_struct(png);
+    png_structp png = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
+    png_infop info = png_create_info_struct(png);
     if (setjmp(png_jmpbuf(png))) {
         fclose(fp);
-        #ifdef HAVE_LIBEXIF
-          exif_write(state, path);
-        #endif
+#ifdef HAVE_LIBEXIF
+        exif_write(state, path);
+#endif
         return -1;
     }
 
     png_init_io(png, fp);
-    png_set_IHDR(png, info, width, height, 8,
-                 PNG_COLOR_TYPE_RGB, PNG_INTERLACE_NONE,
+    png_set_IHDR(png, info, width, height, 8, PNG_COLOR_TYPE_RGB, PNG_INTERLACE_NONE,
                  PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
     png_set_compression_level(png, state->png_compression);
     png_write_info(png, info);
 
     for (uint32_t y = 0; y < height; y++) {
-        const uint8_t *row = rgb + y * width * 3;
+        const uint8_t* row = rgb + y * width * 3;
         png_write_row(png, row);
     }
 
@@ -165,22 +172,22 @@ static int save_png(AppState *state, const uint8_t *rgb,
 
 // ── MJPEG decode to RGB ───────────────────────────────────────────────────────
 
-static uint8_t *mjpeg_decode(const void *data, size_t len,
-                              uint32_t width, uint32_t height) {
-    uint8_t *rgb = (uint8_t *)malloc(width * height * 3);
+static uint8_t* mjpeg_decode(const void* data, size_t len, uint32_t width, uint32_t height)
+{
+    uint8_t* rgb = (uint8_t*)malloc(width * height * 3);
 
     struct jpeg_decompress_struct cinfo;
     struct jpeg_error_mgr jerr;
     cinfo.err = jpeg_std_error(&jerr);
     jpeg_create_decompress(&cinfo);
-    jpeg_mem_src(&cinfo, (const uint8_t *)data, (unsigned long)len);
+    jpeg_mem_src(&cinfo, (const uint8_t*)data, (unsigned long)len);
     jpeg_read_header(&cinfo, TRUE);
     cinfo.out_color_space = JCS_RGB;
     jpeg_start_decompress(&cinfo);
 
     uint32_t row_stride = width * 3;
     while (cinfo.output_scanline < height) {
-        uint8_t *row = rgb + cinfo.output_scanline * row_stride;
+        uint8_t* row = rgb + cinfo.output_scanline * row_stride;
         jpeg_read_scanlines(&cinfo, &row, 1);
     }
 
@@ -191,37 +198,39 @@ static uint8_t *mjpeg_decode(const void *data, size_t len,
 
 // ── YUYV decode to RGB ───────────────────────────────────────────────────────
 
-static uint8_t *yuyv_decode(const void *data,
-                             uint32_t width, uint32_t height) {
-    uint8_t *rgb = (uint8_t *)malloc(width * height * 3);
-    const uint8_t *yuyv = (const uint8_t *)data;
+static uint8_t* yuyv_decode(const void* data, uint32_t width, uint32_t height)
+{
+    uint8_t* rgb = (uint8_t*)malloc(width * height * 3);
+    const uint8_t* yuyv = (const uint8_t*)data;
 
-    auto clamp = [](int x) -> uint8_t {
-        return x < 0 ? 0 : x > 255 ? 255 : (uint8_t)x;
-    };
+    auto clamp = [](int x) -> uint8_t { return x < 0 ? 0 : x > 255 ? 255 : (uint8_t)x; };
 
     size_t n = (size_t)width * height / 2;
-    uint8_t *out = rgb;
+    uint8_t* out = rgb;
     for (size_t i = 0; i < n; i++) {
-        int y0=yuyv[0], u=yuyv[1], y1=yuyv[2], v=yuyv[3];
+        int y0 = yuyv[0], u = yuyv[1], y1 = yuyv[2], v = yuyv[3];
         yuyv += 4;
-        int c,d,e;
-        c=y0-16; d=u-128; e=v-128;
-        *out++=clamp((298*c+409*e+128)>>8);
-        *out++=clamp((298*c-100*d-208*e+128)>>8);
-        *out++=clamp((298*c+516*d+128)>>8);
-        c=y1-16;
-        *out++=clamp((298*c+409*e+128)>>8);
-        *out++=clamp((298*c-100*d-208*e+128)>>8);
-        *out++=clamp((298*c+516*d+128)>>8);
+        int c, d, e;
+        c = y0 - 16;
+        d = u - 128;
+        e = v - 128;
+        *out++ = clamp((298 * c + 409 * e + 128) >> 8);
+        *out++ = clamp((298 * c - 100 * d - 208 * e + 128) >> 8);
+        *out++ = clamp((298 * c + 516 * d + 128) >> 8);
+        c = y1 - 16;
+        *out++ = clamp((298 * c + 409 * e + 128) >> 8);
+        *out++ = clamp((298 * c - 100 * d - 208 * e + 128) >> 8);
+        *out++ = clamp((298 * c + 516 * d + 128) >> 8);
     }
     return rgb;
 }
 
 // ── public api ────────────────────────────────────────────────────────────────
 
-int capture_photo(AppState *state, const void *frame, size_t frame_size) { LOG_FN();
-    uint8_t *rgb;
+int capture_photo(AppState* state, const void* frame, size_t frame_size)
+{
+    LOG_FN();
+    uint8_t* rgb;
 
     if (state->v4l2_format == "mjpeg")
         rgb = mjpeg_decode(frame, frame_size, state->width, state->height);
@@ -238,13 +247,15 @@ int capture_photo(AppState *state, const void *frame, size_t frame_size) { LOG_F
     return ret;
 }
 
-void capture_burst(AppState *state) { LOG_FN();
-    LOG_INFO("burst start (%d frames, %dms interval)",
-           state->burst_count, state->burst_interval_ms);
+void capture_burst(AppState* state)
+{
+    LOG_FN();
+    LOG_INFO("burst start (%d frames, %dms interval)", state->burst_count,
+             state->burst_interval_ms);
 
     for (int i = 0; i < state->burst_count; i++) {
         size_t frame_size = 0;
-        const void *frame = camera_next_frame(state, &frame_size);
+        const void* frame = camera_next_frame(state, &frame_size);
         if (!frame) {
             LOG_WARN("burst frame %d failed", i);
             continue;
@@ -256,17 +267,17 @@ void capture_burst(AppState *state) { LOG_FN();
     LOG_INFO("burst done");
 }
 
-int capture_video_start(AppState *state) { LOG_FN();
+int capture_video_start(AppState* state)
+{
+    LOG_FN();
     char path[1024];
-    capture_build_filename(state, path, sizeof(path),
-                           state->video_format.c_str());
+    capture_build_filename(state, path, sizeof(path), state->video_format.c_str());
     return video_open(state, path);
 }
 
-void capture_video_frame(AppState *state, const void *frame, size_t frame_size) {
+void capture_video_frame(AppState* state, const void* frame, size_t frame_size)
+{
     video_write_frame(state, frame, frame_size);
 }
 
-void capture_video_stop(AppState *state) {
-    video_close(state);
-}
+void capture_video_stop(AppState* state) { video_close(state); }

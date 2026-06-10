@@ -27,21 +27,29 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "theme.h"
 #include <X11/Xlib.h>
 #include <cstdio>
-#include <ctime>
 #include <cstring>
+#include <ctime>
 
-static const char *mode_str(Mode m) {
+static const char* mode_str(Mode m)
+{
     switch (m) {
-        case Mode::Photo:   return "PHOTO";
-        case Mode::Burst:   return "BURST";
-        case Mode::Video:   return "VIDEO";
-        case Mode::Preview: return "PREVIEW";
-        default:            return "???";
+    case Mode::Photo:
+        return "PHOTO";
+    case Mode::Burst:
+        return "BURST";
+    case Mode::Video:
+        return "VIDEO";
+    case Mode::Preview:
+        return "PREVIEW";
+    default:
+        return "???";
     }
 }
 
-void overlay_draw(AppState *state, Display *dpy, Window win, GC gc) {
-    if (!state->overlay_visible) return;
+void overlay_draw(AppState* state, Display* dpy, Window win, GC gc)
+{
+    if (!state->overlay_visible)
+        return;
 
     // text color from theme
     XSetForeground(dpy, gc, current_theme.overlay_text);
@@ -53,8 +61,7 @@ void overlay_draw(AppState *state, Display *dpy, Window win, GC gc) {
     XDrawString(dpy, win, gc, 8, 16, buf, strlen(buf));
 
     // top-left second line: resolution
-    snprintf(buf, sizeof(buf), "%ux%u @ %ufps",
-             state->width, state->height, state->framerate);
+    snprintf(buf, sizeof(buf), "%ux%u @ %ufps", state->width, state->height, state->framerate);
     XDrawString(dpy, win, gc, 8, 32, buf, strlen(buf));
 
     // top-left third line: recording indicator
@@ -67,7 +74,7 @@ void overlay_draw(AppState *state, Display *dpy, Window win, GC gc) {
 
     // bottom-left: timestamp
     time_t now = time(nullptr);
-    struct tm *tm = localtime(&now);
+    struct tm* tm = localtime(&now);
     strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", tm);
     int margin = current_theme.overlay_margin > 0 ? current_theme.overlay_margin : 8;
     XDrawString(dpy, win, gc, margin, state->win_h - margin, buf, strlen(buf));
@@ -78,9 +85,12 @@ void overlay_draw(AppState *state, Display *dpy, Window win, GC gc) {
             // approximate centering using character width ~8 px
             int len = (int)strlen(state->notification.c_str());
             int x = state->win_w / 2 - (len * 8) / 2;
-            if (x < 8) x = 8;
-            XDrawString(dpy, win, gc, x, state->win_h / 2, state->notification.c_str(), (int)state->notification.size());
-        } else {
+            if (x < 8)
+                x = 8;
+            XDrawString(dpy, win, gc, x, state->win_h / 2, state->notification.c_str(),
+                        (int)state->notification.size());
+        }
+        else {
             state->notification.clear();
         }
     }

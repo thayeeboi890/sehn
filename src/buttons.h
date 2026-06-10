@@ -28,7 +28,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "sehn.h"
 #include <X11/Xlib.h>
 
-void buttons_init(AppState *state);
+void buttons_init(AppState* state);
 
 // Handle non-PTZ button events (mouse buttons / wheel). Returns true if handled.
-bool buttons_handle_button_event(AppState *state, XButtonEvent *ev);
+bool buttons_handle_button_event(AppState* state, XButtonEvent* ev);

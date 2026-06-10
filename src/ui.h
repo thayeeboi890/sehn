@@ -28,12 +28,13 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "sehn.h"
 
 // Create the X11 window, start the frame loop, handle input.
-int ui_run(AppState *state);
+int ui_run(AppState* state);
 
 // Tear down the X11 window and free resources.
-void ui_cleanup(AppState *state);
+void ui_cleanup(AppState* state);
 
 // Present the last-converted RGB frame using the provided source rectangle.
 // This is used by input handlers to render software-only pan/zoom while dragging
 // without committing hardware PTZ until release.
-void ui_present_last_rgb_region(AppState *state, int src_x, int src_y, uint32_t src_w, uint32_t src_h);
+void ui_present_last_rgb_region(AppState* state, int src_x, int src_y, uint32_t src_w,
+                                uint32_t src_h);

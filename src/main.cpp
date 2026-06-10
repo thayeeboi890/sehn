@@ -28,18 +28,20 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <cstring>
 #include <getopt.h>
 
-#include "sehn.h"
-#include "version.h"
-#include "config.h"
-#include "cli.h"
-#include "signals.h"
-#include "list.h"
 #include "camera.h"
-#include "ui.h"
+#include "cli.h"
+#include "config.h"
 #include "files.h"
+#include "list.h"
+#include "sehn.h"
+#include "signals.h"
+#include "ui.h"
 #include "utils.h"
+#include "version.h"
 
-int main(int argc, char *argv[]) { LOG_FN();
+int main(int argc, char* argv[])
+{
+    LOG_FN();
     // 1. start with defaults
     AppState state = make_default_state();
 

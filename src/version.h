@@ -27,20 +27,20 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 void sehn_print_version();
 
-#define SEHN_VERSION        "0.1.0"
-#define SEHN_VERSION_MAJOR  0
-#define SEHN_VERSION_MINOR  1
-#define SEHN_VERSION_PATCH  0
+#define SEHN_VERSION "0.1.0"
+#define SEHN_VERSION_MAJOR 0
+#define SEHN_VERSION_MINOR 1
+#define SEHN_VERSION_PATCH 0
 
 // set by meson via config.h
 #ifdef HAVE_LIBEXIF
-#  define SEHN_FEAT_EXIF    true
+#define SEHN_FEAT_EXIF true
 #else
-#  define SEHN_FEAT_EXIF    false
+#define SEHN_FEAT_EXIF false
 #endif
 
 #ifdef HAVE_LIBCURL
-#  define SEHN_FEAT_CURL    true
+#define SEHN_FEAT_CURL true
 #else
-#  define SEHN_FEAT_CURL    false
+#define SEHN_FEAT_CURL false
 #endif

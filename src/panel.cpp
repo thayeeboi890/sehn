@@ -36,9 +36,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //   [ ⊙ ]  mode indicator       — middle
 //   [ ◉ ]  shutter button       — bottom
 
-static void draw_button(Display *dpy, Window win, GC gc,
-                         int x, int y, int w, int h,
-                         const char *label, bool active) {
+static void draw_button(Display* dpy, Window win, GC gc, int x, int y, int w, int h,
+                        const char* label, bool active)
+{
     // background
     XSetForeground(dpy, gc, active ? current_theme.button_bg : current_theme.button_bg);
     XFillRectangle(dpy, win, gc, x, y, w, h);
@@ -54,28 +54,37 @@ static void draw_button(Display *dpy, Window win, GC gc,
     XDrawString(dpy, win, gc, lx, ly, label, strlen(label));
 }
 
-static const char *mode_short(Mode m) {
+static const char* mode_short(Mode m)
+{
     switch (m) {
-        case Mode::Photo:   return "PHO";
-        case Mode::Burst:   return "BST";
-        case Mode::Video:   return "VID";
-        case Mode::Preview: return "PRV";
-        default:            return "???";
+    case Mode::Photo:
+        return "PHO";
+    case Mode::Burst:
+        return "BST";
+    case Mode::Video:
+        return "VID";
+    case Mode::Preview:
+        return "PRV";
+    default:
+        return "???";
     }
 }
 
-void panel_draw(AppState *state, Display *dpy, Window win, GC gc) {
-    if (!state->panel_visible) return;
+void panel_draw(AppState* state, Display* dpy, Window win, GC gc)
+{
+    if (!state->panel_visible)
+        return;
 
-    int pw = state->panel_width;        // panel width
-    int ph = state->win_h;              // panel height
-    int px = state->win_w;              // panel x offset (right of viewfinder)
-    int bw = pw - 4;                    // button width
-    int bh = pw - 4;                    // button height (square)
+    int pw = state->panel_width; // panel width
+    int ph = state->win_h;       // panel height
+    int px = state->win_w;       // panel x offset (right of viewfinder)
+    int bw = pw - 4;             // button width
+    int bh = pw - 4;             // button height (square)
     // if theme provides a preferred button size, use that (clamped to panel width)
     if (current_theme.panel_button_size > 0) {
         bh = current_theme.panel_button_size;
-        if (bh > pw - 4) bh = pw - 4;
+        if (bh > pw - 4)
+            bh = pw - 4;
         bw = bh;
     }
     int pad = current_theme.panel_padding > 0 ? current_theme.panel_padding : 4;
@@ -93,33 +102,38 @@ void panel_draw(AppState *state, Display *dpy, Window win, GC gc) {
 
     // ── mode button — middle ─────────────────────────────────────────────────
     int mid_y = ph / 2 - bh / 2;
-    draw_button(dpy, win, gc, px + pad, mid_y, bw, bh,
-                mode_short(state->mode), false);
+    draw_button(dpy, win, gc, px + pad, mid_y, bw, bh, mode_short(state->mode), false);
 
     // ── shutter button — bottom ──────────────────────────────────────────────
     int bot_y = ph - bh - pad;
-    draw_button(dpy, win, gc, px + pad, bot_y, bw, bh,
-                state->recording ? "■" : "●", state->recording);
+    draw_button(dpy, win, gc, px + pad, bot_y, bw, bh, state->recording ? "■" : "●",
+                state->recording);
 }
 
 // hit-test: returns which panel element was clicked, or -1 for none
 // call from ui.cpp mouse handler
-int panel_hittest(AppState *state, int x, int y) {
-    if (!state->panel_visible) return -1;
-    if (x < state->win_w) return -1;  // not in panel
+int panel_hittest(AppState* state, int x, int y)
+{
+    if (!state->panel_visible)
+        return -1;
+    if (x < state->win_w)
+        return -1; // not in panel
 
-    int pw  = state->panel_width;
-    int ph  = state->win_h;
-    int bh  = pw - 4;
+    int pw = state->panel_width;
+    int ph = state->win_h;
+    int bh = pw - 4;
 
     // hamburger
-    if (y >= 4 && y < 4 + bh)           return PANEL_MENU;
+    if (y >= 4 && y < 4 + bh)
+        return PANEL_MENU;
     // mode
     int mid_y = ph / 2 - bh / 2;
-    if (y >= mid_y && y < mid_y + bh)   return PANEL_MODE;
+    if (y >= mid_y && y < mid_y + bh)
+        return PANEL_MODE;
     // shutter
     int bot_y = ph - bh - 4;
-    if (y >= bot_y && y < bot_y + bh)   return PANEL_SHUTTER;
+    if (y >= bot_y && y < bot_y + bh)
+        return PANEL_SHUTTER;
 
     return -1;
 }

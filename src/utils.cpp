@@ -25,51 +25,54 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "utils.h"
 #include "theme.h"
-#include "theme.h"
-#include <cstdio>
 #include <cstdarg>
+#include <cstdio>
 #include <ctime>
 #include <mutex>
 
 // define current_theme here so it's linked into the final binary (theme.cpp
 // may be optional in the build system). Values mirror theme.cpp defaults.
 Theme current_theme = {
-    0x000000, // background
-    0xFFFFFF, // foreground
-    0x1a1a1a, // panel_bg
-    0x444444, // panel_separator
-    0x222222, // button_bg
-    0x666666, // button_border
-    0xFFFFFF, // button_text
-    8,        // panel_padding
-    56,       // panel_button_size
-    0xFFFFFF, // overlay_text
-    0xFF0000, // rec_color
-    12,       // overlay_font_size
-    8,        // overlay_margin
+    0x000000,      // background
+    0xFFFFFF,      // foreground
+    0x1a1a1a,      // panel_bg
+    0x444444,      // panel_separator
+    0x222222,      // button_bg
+    0x666666,      // button_border
+    0xFFFFFF,      // button_text
+    8,             // panel_padding
+    56,            // panel_button_size
+    0xFFFFFF,      // overlay_text
+    0xFF0000,      // rec_color
+    12,            // overlay_font_size
+    8,             // overlay_margin
     std::string(), // icon_menu
     std::string(), // icon_mode
     std::string(), // icon_shutter
-    1.0f,     // dpi_scale
-    "fixed"  // font
+    1.0f,          // dpi_scale
+    "fixed"        // font
 };
 
 static bool g_verbose = false;
-static bool g_quiet   = false;
+static bool g_quiet = false;
 static std::mutex g_log_mutex;
-void log_init(AppState *state) {
+void log_init(AppState* state)
+{
     g_verbose = state->verbose;
-    g_quiet   = state->quiet;
+    g_quiet = state->quiet;
 }
 
-void sehn_log(LogLevel level, const char *fmt, ...) {
+void sehn_log(LogLevel level, const char* fmt, ...)
+{
     // filter by level
-    if (level == LogLevel::Info  && g_quiet)   return;
-    if (level == LogLevel::Warn  && g_quiet)   return;
-    if (level == LogLevel::Debug && !g_verbose) return;
+    if (level == LogLevel::Info && g_quiet)
+        return;
+    if (level == LogLevel::Warn && g_quiet)
+        return;
+    if (level == LogLevel::Debug && !g_verbose)
+        return;
 
-    FILE *out = (level == LogLevel::Error ||
-                 level == LogLevel::Warn) ? stderr : stdout;
+    FILE* out = (level == LogLevel::Error || level == LogLevel::Warn) ? stderr : stdout;
 
     // timestamp
     time_t t = time(nullptr);
@@ -77,8 +80,9 @@ void sehn_log(LogLevel level, const char *fmt, ...) {
 #if defined(_POSIX_THREAD_SAFE_FUNCTIONS)
     localtime_r(&t, &tm_buf);
 #else
-    struct tm *tmp = localtime(&t);
-    if (tmp) tm_buf = *tmp;
+    struct tm* tmp = localtime(&t);
+    if (tmp)
+        tm_buf = *tmp;
 #endif
     char ts[64];
     strftime(ts, sizeof(ts), "%F %T", &tm_buf);
@@ -88,10 +92,18 @@ void sehn_log(LogLevel level, const char *fmt, ...) {
     // prefix
     fprintf(out, "%s ", ts);
     switch (level) {
-        case LogLevel::Warn:  fprintf(out, "sehn: warning: "); break;
-        case LogLevel::Error: fprintf(out, "sehn: error: ");   break;
-        case LogLevel::Debug: fprintf(out, "sehn: debug: ");   break;
-        default: fprintf(out, "sehn: ");                       break;
+    case LogLevel::Warn:
+        fprintf(out, "sehn: warning: ");
+        break;
+    case LogLevel::Error:
+        fprintf(out, "sehn: error: ");
+        break;
+    case LogLevel::Debug:
+        fprintf(out, "sehn: debug: ");
+        break;
+    default:
+        fprintf(out, "sehn: ");
+        break;
     }
 
     va_list args;

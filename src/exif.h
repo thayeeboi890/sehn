@@ -33,6 +33,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 // Write EXIF metadata to a JPEG file at path.
 // Call after saving the file.
 // Returns 0 on success, -1 on failure.
-int exif_write(AppState *state, const char *path);
+int exif_write(AppState* state, const char* path);
 
 #endif

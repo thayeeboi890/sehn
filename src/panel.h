@@ -27,9 +27,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "sehn.h"
 #include <X11/Xlib.h>
 
-#define PANEL_MENU     0
-#define PANEL_MODE     1
-#define PANEL_SHUTTER  2
+#define PANEL_MENU 0
+#define PANEL_MODE 1
+#define PANEL_SHUTTER 2
 
-void panel_draw(AppState *state, Display *dpy, Window win, GC gc);
-int  panel_hittest(AppState *state, int x, int y);
+void panel_draw(AppState* state, Display* dpy, Window win, GC gc);
+int panel_hittest(AppState* state, int x, int y);

@@ -24,41 +24,47 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 #include "list.h"
+#include "utils.h"
+#include <cerrno>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
-#include <cstdint>
-#include <cerrno>
-#include <fcntl.h>
-#include <unistd.h>
 #include <dirent.h>
-#include <sys/ioctl.h>
+#include <fcntl.h>
 #include <linux/videodev2.h>
-#include "utils.h"
+#include <sys/ioctl.h>
+#include <unistd.h>
 
-static int xioctl(int fd, unsigned long request, void *arg) {
+static int xioctl(int fd, unsigned long request, void* arg)
+{
     int r;
-    do { r = ioctl(fd, request, arg); }
-    while (r == -1 && errno == EINTR);
+    do {
+        r = ioctl(fd, request, arg);
+    } while (r == -1 && errno == EINTR);
     return r;
 }
 
-int list_devices() { LOG_FN();
-    DIR *d = opendir("/sys/class/video4linux");
+int list_devices()
+{
+    LOG_FN();
+    DIR* d = opendir("/sys/class/video4linux");
     if (!d) {
         LOG_ERROR("cannot open /sys/class/video4linux");
         return 1;
     }
 
     int found = 0;
-    struct dirent *entry;
+    struct dirent* entry;
     while ((entry = readdir(d))) {
-        if (entry->d_name[0] == '.') continue;
+        if (entry->d_name[0] == '.')
+            continue;
 
         char devpath[64];
         snprintf(devpath, sizeof(devpath), "/dev/%s", entry->d_name);
 
         int fd = open(devpath, O_RDWR | O_NONBLOCK);
-        if (fd < 0) continue;
+        if (fd < 0)
+            continue;
 
         struct v4l2_capability cap = {};
         if (xioctl(fd, VIDIOC_QUERYCAP, &cap) == 0) {
@@ -82,7 +88,9 @@ int list_devices() { LOG_FN();
     return 0;
 }
 
-int list_formats(const char *device) { LOG_FN();
+int list_formats(const char* device)
+{
+    LOG_FN();
     int fd = open(device, O_RDWR | O_NONBLOCK);
     if (fd < 0) {
         LOG_ERROR("cannot open %s", device);
@@ -102,8 +110,7 @@ int list_formats(const char *device) { LOG_FN();
     fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
     while (xioctl(fd, VIDIOC_ENUM_FMT, &fmt) == 0) {
-        printf("  [%s] %s\n",
-               (char *)&fmt.pixelformat, fmt.description);
+        printf("  [%s] %s\n", (char*)&fmt.pixelformat, fmt.description);
 
         // enumerate frame sizes for this format
         struct v4l2_frmsizeenum fsize = {};
@@ -111,22 +118,18 @@ int list_formats(const char *device) { LOG_FN();
 
         while (xioctl(fd, VIDIOC_ENUM_FRAMESIZES, &fsize) == 0) {
             if (fsize.type == V4L2_FRMSIZE_TYPE_DISCRETE) {
-                printf("    %ux%u",
-                       fsize.discrete.width,
-                       fsize.discrete.height);
+                printf("    %ux%u", fsize.discrete.width, fsize.discrete.height);
 
                 // enumerate framerates for this size
                 struct v4l2_frmivalenum fival = {};
                 fival.pixel_format = fmt.pixelformat;
-                fival.width        = fsize.discrete.width;
-                fival.height       = fsize.discrete.height;
+                fival.width = fsize.discrete.width;
+                fival.height = fsize.discrete.height;
 
                 printf(" @");
                 while (xioctl(fd, VIDIOC_ENUM_FRAMEINTERVALS, &fival) == 0) {
                     if (fival.type == V4L2_FRMIVAL_TYPE_DISCRETE) {
-                        printf(" %ufps",
-                               fival.discrete.denominator /
-                               fival.discrete.numerator);
+                        printf(" %ufps", fival.discrete.denominator / fival.discrete.numerator);
                     }
                     fival.index++;
                 }
@@ -142,7 +145,9 @@ int list_formats(const char *device) { LOG_FN();
     return 0;
 }
 
-int list_controls(const char *device) { LOG_FN();
+int list_controls(const char* device)
+{
+    LOG_FN();
     int fd = open(device, O_RDWR | O_NONBLOCK);
     if (fd < 0) {
         LOG_ERROR("cannot open %s", device);
@@ -163,31 +168,28 @@ int list_controls(const char *device) { LOG_FN();
         }
 
         // get current value for integer/boolean controls
-        if (qc.type == V4L2_CTRL_TYPE_INTEGER ||
-            qc.type == V4L2_CTRL_TYPE_BOOLEAN ||
+        if (qc.type == V4L2_CTRL_TYPE_INTEGER || qc.type == V4L2_CTRL_TYPE_BOOLEAN ||
             qc.type == V4L2_CTRL_TYPE_MENU) {
 
             struct v4l2_control ctrl = {};
             ctrl.id = qc.id;
             xioctl(fd, VIDIOC_G_CTRL, &ctrl);
 
-            printf("  %-32s  val=%-6d  min=%-6lld  max=%-6lld  step=%lld\n",
-                   qc.name,
-                   ctrl.value,
+            printf("  %-32s  val=%-6d  min=%-6lld  max=%-6lld  step=%lld\n", qc.name, ctrl.value,
                    qc.minimum, qc.maximum, qc.step);
 
             // print menu items if it's a menu control
             if (qc.type == V4L2_CTRL_TYPE_MENU) {
                 struct v4l2_querymenu qm = {};
                 qm.id = qc.id;
-                for (qm.index = (uint32_t)qc.minimum;
-                     qm.index <= (uint32_t)qc.maximum;
+                for (qm.index = (uint32_t)qc.minimum; qm.index <= (uint32_t)qc.maximum;
                      qm.index++) {
                     if (xioctl(fd, VIDIOC_QUERYMENU, &qm) == 0)
                         printf("    %u: %s\n", qm.index, qm.name);
                 }
             }
-        } else {
+        }
+        else {
             printf("  %-32s  (type=%u)\n", qc.name, qc.type);
         }
 

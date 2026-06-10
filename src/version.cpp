@@ -26,7 +26,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "version.h"
 #include <cstdio>
 
-void sehn_print_version() {
+void sehn_print_version()
+{
     printf("sehn %s\n", SEHN_VERSION);
     printf("  exif: %s\n", SEHN_FEAT_EXIF ? "enabled" : "disabled");
     printf("  curl: %s\n", SEHN_FEAT_CURL ? "enabled" : "disabled");

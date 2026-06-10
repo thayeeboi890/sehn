@@ -25,9 +25,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
-#include <string>
 #include <cstdint>
 #include <ctime>
+#include <string>
 
 // forward declarations
 struct CameraState;
@@ -49,49 +49,49 @@ enum class ZoomMode {
 
 struct AppState {
     // --- camera ---
-    std::string device;      
-    int         camera_fd;      
-    uint32_t    width;
-    uint32_t    height;
-    uint32_t    framerate;
-    std::string v4l2_format;   
+    std::string device;
+    int camera_fd;
+    uint32_t width;
+    uint32_t height;
+    uint32_t framerate;
+    std::string v4l2_format;
 
     // --- mode ---
-    Mode        mode;
-    bool        recording;    
-    bool        paused;      
+    Mode mode;
+    bool recording;
+    bool paused;
 
     // --- ui ---
-    bool        fullscreen;
-    bool        borderless;
-    bool        panel_visible;
-    bool        overlay_visible;
-    bool        hide_pointer;
-    int         panel_width;
-    int         win_w, win_h;
+    bool fullscreen;
+    bool borderless;
+    bool panel_visible;
+    bool overlay_visible;
+    bool hide_pointer;
+    int panel_width;
+    int win_w, win_h;
 
     // --- zoom/pan ---
-    ZoomMode    zoom_mode;
-    float       zoom;       
-    int         pan_x, pan_y;
+    ZoomMode zoom_mode;
+    float zoom;
+    int pan_x, pan_y;
 
     // --- capture ---
     std::string output_dir;
     std::string filename_pattern;
-    std::string save_format;    
-    int         jpeg_quality;
-    int         png_compression;
-    int         burst_count;
-    int         burst_interval_ms;
-    std::string video_format; 
+    std::string save_format;
+    int jpeg_quality;
+    int png_compression;
+    int burst_count;
+    int burst_interval_ms;
+    std::string video_format;
 
     // --- camera controls ---
-    bool        autofocus;
-    std::string exposure_mode; 
-    int         exposure_time;
-    int         gain;
-    std::string wb_mode;     
-    int         wb_temp;    
+    bool autofocus;
+    std::string exposure_mode;
+    int exposure_time;
+    int gain;
+    std::string wb_mode;
+    int wb_temp;
 
     // --- signals ---
     volatile bool sig_capture;
@@ -99,29 +99,30 @@ struct AppState {
     volatile bool sig_reload_config;
 
     // --- early exit flags ---
-    bool list_devices_and_exit; 
+    bool list_devices_and_exit;
     bool list_formats_and_exit;
     bool list_controls_and_exit;
     bool print_config_and_exit;
 
     // --- misc ---
-    bool        verbose;
-    bool        quiet;
-    bool        running;   
-    std::string theme;        
-    std::string config_path; 
+    bool verbose;
+    bool quiet;
+    bool running;
+    std::string theme;
+    std::string config_path;
 
     // --- notifications ---
-    std::string notification; /* transient user-visible message */
-    time_t      notification_until; /* time when notification expires */
+    std::string notification;  /* transient user-visible message */
+    time_t notification_until; /* time when notification expires */
 
     // --- mouse state ---
-    int  mouse_button;       /* button currently pressed (0 = none) */
-    bool mouse_dragging;     /* true while dragging */
-    int  mouse_down_x, mouse_down_y; /* initial coords */
-    int  mouse_start_pan_x, mouse_start_pan_y; /* pan at drag start */
+    int mouse_button;                                  /* button currently pressed (0 = none) */
+    bool mouse_dragging;                               /* true while dragging */
+    int mouse_down_x, mouse_down_y;                    /* initial coords */
+    int mouse_start_pan_x, mouse_start_pan_y;          /* pan at drag start */
     float mouse_start_pan_frac, mouse_start_tilt_frac; /* hardware pan/tilt fractions */
-    float mouse_start_zoom;  /* zoom at drag start */
-    uint64_t mouse_last_hw_update_ms; /* last time hardware PTZ was updated during drag */};
+    float mouse_start_zoom;                            /* zoom at drag start */
+    uint64_t mouse_last_hw_update_ms; /* last time hardware PTZ was updated during drag */
+};
 
 AppState make_default_state();

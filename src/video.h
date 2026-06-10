@@ -30,14 +30,14 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 // Open output file and initialize encoder.
 // Returns 0 on success, -1 on failure.
-int video_open(AppState *state, const char *path);
+int video_open(AppState* state, const char* path);
 
 // Encode and write one raw frame.
 // data/size is the raw V4L2 frame (MJPEG or YUYV).
-void video_write_frame(AppState *state, const void *data, size_t size);
+void video_write_frame(AppState* state, const void* data, size_t size);
 
 // Flush, write trailer, close file.
-void video_close(AppState *state);
+void video_close(AppState* state);
 
 // return true if video is currently open (recording)
 bool vid_is_open();

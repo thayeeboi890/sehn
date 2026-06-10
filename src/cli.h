@@ -30,4 +30,4 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 // Parse argc/argv and write results into state.
 // Exits the process on --help or --version.
 // Returns 0 on success, 1 on bad arguments.
-int cli_parse(int argc, char *argv[], AppState *state);
+int cli_parse(int argc, char* argv[], AppState* state);

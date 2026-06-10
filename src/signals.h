@@ -29,7 +29,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 // Register signal handlers for SIGUSR1, SIGUSR2, SIGHUP.
 // Handlers write into state so the main loop can react.
-void signals_init(AppState *state);
+void signals_init(AppState* state);
 
 // Call this from the main loop to process any pending signal flags.
-void signals_dispatch(AppState *state);
+void signals_dispatch(AppState* state);
