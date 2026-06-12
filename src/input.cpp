@@ -30,6 +30,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "ui.h"
 #include "utils.h"
 #include <X11/keysym.h>
+#include <X11/Xutil.h>
 #include <cmath>
 #include <cstdio>
 #include <time.h>
@@ -207,16 +208,39 @@ static void do_action(AppState* state, Action action)
     }
 }
 
+static Action lookup_key_action(const KeyMap& km, XKeyEvent* ev)
+{
+    KeySym syms[] = {
+        XLookupKeysym(ev, 0),
+        XLookupKeysym(ev, 1),
+    };
+
+    for (KeySym sym : syms) {
+        Action action = keys_lookup(km, sym);
+        if (action != Action::Unknown)
+            return action;
+
+        KeySym lower = NoSymbol;
+        KeySym upper = NoSymbol;
+        XConvertCase(sym, &lower, &upper);
+
+        action = keys_lookup(km, lower);
+        if (action != Action::Unknown)
+            return action;
+
+        action = keys_lookup(km, upper);
+        if (action != Action::Unknown)
+            return action;
+    }
+
+    return Action::Unknown;
+}
+
 void input_handle_key(AppState* state, const KeyMap& km, XKeyEvent* ev)
 {
-    // try unshifted first, then shifted — this handles CapsLock/Shift variations
-    KeySym sym = XLookupKeysym(ev, 0);
-    Action action = keys_lookup(km, sym);
-    if (action == Action::Unknown) {
-        sym = XLookupKeysym(ev, 1);
-        action = keys_lookup(km, sym);
-    }
+    Action action = lookup_key_action(km, ev);
     do_action(state, action);
+    ui_present_current_frame(state);
 }
 
 void input_handle_button(AppState* state, XButtonEvent* ev)
@@ -228,9 +252,11 @@ void input_handle_button(AppState* state, XButtonEvent* ev)
         switch (hit) {
         case PANEL_SHUTTER:
             do_action(state, Action::Capture);
+            ui_present_current_frame(state);
             return;
         case PANEL_MODE:
             do_action(state, Action::NextMode);
+            ui_present_current_frame(state);
             return;
         case PANEL_MENU:
             /* TODO: open menu */
@@ -246,12 +272,14 @@ void input_handle_button(AppState* state, XButtonEvent* ev)
     if (btn == 3) {
         // toggle menu/panel
         state->panel_visible = !state->panel_visible;
+        ui_present_current_frame(state);
         return;
     }
 
     if (btn == 2) {
         // middle click -> reset to fit
         state->zoom_mode = ZoomMode::Fit;
+        ui_present_current_frame(state);
         return;
     }
 
@@ -286,6 +314,7 @@ void input_handle_button(AppState* state, XButtonEvent* ev)
                 camera_apply_controls(state);
             }
         }
+        ui_present_current_frame(state);
         return;
     }
 

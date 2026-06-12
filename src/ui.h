@@ -38,3 +38,6 @@ void ui_cleanup(AppState* state);
 // without committing hardware PTZ until release.
 void ui_present_last_rgb_region(AppState* state, int src_x, int src_y, uint32_t src_w,
                                 uint32_t src_h);
+
+// Present the last-converted RGB frame using the current zoom, pan, flip, and rotation state.
+void ui_present_current_frame(AppState* state);

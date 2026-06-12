@@ -30,6 +30,41 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <cstdio>
 #include <cstring>
 
+struct PanelLayout {
+    int pw;
+    int ph;
+    int px;
+    int bw;
+    int bh;
+    int pad;
+    int top_y;
+    int mid_y;
+    int bot_y;
+};
+
+static PanelLayout panel_layout(AppState* state)
+{
+    PanelLayout l{};
+    l.pw = state->panel_width;
+    l.ph = state->win_h;
+    l.px = state->win_w;
+    l.bw = l.pw - 4;
+    l.bh = l.pw - 4;
+
+    if (current_theme.panel_button_size > 0) {
+        l.bh = current_theme.panel_button_size;
+        if (l.bh > l.pw - 4)
+            l.bh = l.pw - 4;
+        l.bw = l.bh;
+    }
+
+    l.pad = current_theme.panel_padding > 0 ? current_theme.panel_padding : 4;
+    l.top_y = l.pad;
+    l.mid_y = l.ph / 2 - l.bh / 2;
+    l.bot_y = l.ph - l.bh - l.pad;
+    return l;
+}
+
 // panel is a vertical strip on the right edge of the window.
 // layout (top to bottom):
 //   [ ☰ ]  hamburger menu       — top
@@ -75,38 +110,24 @@ void panel_draw(AppState* state, Display* dpy, Window win, GC gc)
     if (!state->panel_visible)
         return;
 
-    int pw = state->panel_width; // panel width
-    int ph = state->win_h;       // panel height
-    int px = state->win_w;       // panel x offset (right of viewfinder)
-    int bw = pw - 4;             // button width
-    int bh = pw - 4;             // button height (square)
-    // if theme provides a preferred button size, use that (clamped to panel width)
-    if (current_theme.panel_button_size > 0) {
-        bh = current_theme.panel_button_size;
-        if (bh > pw - 4)
-            bh = pw - 4;
-        bw = bh;
-    }
-    int pad = current_theme.panel_padding > 0 ? current_theme.panel_padding : 4;
+    PanelLayout l = panel_layout(state);
 
     // panel background
     XSetForeground(dpy, gc, current_theme.panel_bg);
-    XFillRectangle(dpy, win, gc, px, 0, pw, ph);
+    XFillRectangle(dpy, win, gc, l.px, 0, l.pw, l.ph);
 
     // separator line between viewfinder and panel
     XSetForeground(dpy, gc, current_theme.panel_separator);
-    XDrawLine(dpy, win, gc, px, 0, px, ph);
+    XDrawLine(dpy, win, gc, l.px, 0, l.px, l.ph);
 
     // ── hamburger menu — top ─────────────────────────────────────────────────
-    draw_button(dpy, win, gc, px + pad, pad, bw, bh, "=", false);
+    draw_button(dpy, win, gc, l.px + l.pad, l.top_y, l.bw, l.bh, "=", false);
 
     // ── mode button — middle ─────────────────────────────────────────────────
-    int mid_y = ph / 2 - bh / 2;
-    draw_button(dpy, win, gc, px + pad, mid_y, bw, bh, mode_short(state->mode), false);
+    draw_button(dpy, win, gc, l.px + l.pad, l.mid_y, l.bw, l.bh, mode_short(state->mode), false);
 
     // ── shutter button — bottom ──────────────────────────────────────────────
-    int bot_y = ph - bh - pad;
-    draw_button(dpy, win, gc, px + pad, bot_y, bw, bh, state->recording ? "■" : "●",
+    draw_button(dpy, win, gc, l.px + l.pad, l.bot_y, l.bw, l.bh, state->recording ? "■" : "●",
                 state->recording);
 }
 
@@ -119,20 +140,19 @@ int panel_hittest(AppState* state, int x, int y)
     if (x < state->win_w)
         return -1; // not in panel
 
-    int pw = state->panel_width;
-    int ph = state->win_h;
-    int bh = pw - 4;
+    PanelLayout l = panel_layout(state);
+    int button_x = l.px + l.pad;
+    if (x < button_x || x >= button_x + l.bw)
+        return -1;
 
     // hamburger
-    if (y >= 4 && y < 4 + bh)
+    if (y >= l.top_y && y < l.top_y + l.bh)
         return PANEL_MENU;
     // mode
-    int mid_y = ph / 2 - bh / 2;
-    if (y >= mid_y && y < mid_y + bh)
+    if (y >= l.mid_y && y < l.mid_y + l.bh)
         return PANEL_MODE;
     // shutter
-    int bot_y = ph - bh - 4;
-    if (y >= bot_y && y < bot_y + bh)
+    if (y >= l.bot_y && y < l.bot_y + l.bh)
         return PANEL_SHUTTER;
 
     return -1;

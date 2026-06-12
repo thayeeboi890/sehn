@@ -474,6 +474,56 @@ static void present_frame_static(AppState* state, uint8_t* frame_rgb, uint32_t p
 
 // ── input handling ────────────────────────────────────────────────────────────
 
+struct SourceRegion {
+    uint32_t w;
+    uint32_t h;
+    int x;
+    int y;
+};
+
+static SourceRegion current_source_region(AppState* state)
+{
+    SourceRegion r{};
+
+    if (state->zoom_mode == ZoomMode::Fit || state->zoom_mode == ZoomMode::Fill) {
+        float scale_x = (float)state->win_w / (float)state->width;
+        float scale_y = (float)state->win_h / (float)state->height;
+        float scale = (state->zoom_mode == ZoomMode::Fill)
+                          ? (scale_x > scale_y ? scale_x : scale_y)
+                          : (scale_x < scale_y ? scale_x : scale_y);
+        r.w = state->width;
+        r.h = state->height;
+        r.x = 0;
+        r.y = 0;
+        state->zoom = scale;
+        return r;
+    }
+
+    float inv = 1.0f / state->zoom;
+    r.w = (uint32_t)((float)state->width * inv);
+    r.h = (uint32_t)((float)state->height * inv);
+
+    if (r.w > state->width)
+        r.w = state->width;
+    if (r.h > state->height)
+        r.h = state->height;
+
+    int max_x = (int)state->width - (int)r.w;
+    int max_y = (int)state->height - (int)r.h;
+    if (state->pan_x < 0)
+        state->pan_x = 0;
+    if (state->pan_y < 0)
+        state->pan_y = 0;
+    if (state->pan_x > max_x)
+        state->pan_x = max_x;
+    if (state->pan_y > max_y)
+        state->pan_y = max_y;
+    r.x = state->pan_x;
+    r.y = state->pan_y;
+
+    return r;
+}
+
 void ui_present_last_rgb_region(AppState* state, int src_x, int src_y, uint32_t src_w,
                                 uint32_t src_h)
 {
@@ -481,6 +531,15 @@ void ui_present_last_rgb_region(AppState* state, int src_x, int src_y, uint32_t 
     if (ui.last_rgb && ui.last_rgb_size >= (size_t)src_w * src_h * 3) {
         present_frame_static(state, ui.last_rgb, (uint32_t)src_w, (uint32_t)src_h, src_x, src_y);
     }
+    pthread_mutex_unlock(&ui.last_rgb_mutex);
+}
+
+void ui_present_current_frame(AppState* state)
+{
+    SourceRegion src = current_source_region(state);
+    pthread_mutex_lock(&ui.last_rgb_mutex);
+    if (ui.last_rgb)
+        present_frame_static(state, ui.last_rgb, src.w, src.h, src.x, src.y);
     pthread_mutex_unlock(&ui.last_rgb_mutex);
 }
 
@@ -653,109 +712,109 @@ int ui_run(AppState* state)
         FD_ZERO(&rfds);
         FD_SET(xfd, &rfds);
         struct timeval tv = {0, 20000}; // 20ms
-        int sel = select(xfd + 1, &rfds, nullptr, nullptr, &tv);
-        if (sel < 0) {
-            if (errno == EINTR)
-                continue;
-            perror("select");
-            break;
+        if (!XPending(ui.dpy)) {
+            int sel = select(xfd + 1, &rfds, nullptr, nullptr, &tv);
+            if (sel < 0) {
+                if (errno == EINTR)
+                    continue;
+                perror("select");
+                break;
+            }
         }
 
-        // process any X events if available
-        if (FD_ISSET(xfd, &rfds)) {
-            while (XPending(ui.dpy)) {
-                XEvent ev;
-                XNextEvent(ui.dpy, &ev);
-                if (ev.type == KeyPress)
-                    input_handle_key(state, km, &ev.xkey);
-                else if (ev.type == ClientMessage) {
-                    if ((Atom)ev.xclient.data.l[0] == wm_delete)
-                        state->running = false;
+        // Drain Xlib's internal event queue even when the X socket is no longer readable.
+        while (XPending(ui.dpy)) {
+            XEvent ev;
+            XNextEvent(ui.dpy, &ev);
+            if (ev.type == KeyPress)
+                input_handle_key(state, km, &ev.xkey);
+            else if (ev.type == ClientMessage) {
+                if ((Atom)ev.xclient.data.l[0] == wm_delete)
+                    state->running = false;
+            }
+            else if (ev.type == ButtonPress) {
+                input_handle_button(state, &ev.xbutton);
+            }
+            else if (ev.type == ButtonRelease) {
+                input_handle_button_release(state, &ev.xbutton);
+            }
+            else if (ev.type == MotionNotify) {
+                input_handle_motion(state, &ev.xmotion);
+            }
+            else if (ev.type == ConfigureNotify) {
+                int new_win_w = ev.xconfigure.width - state->panel_width;
+                int new_win_h = ev.xconfigure.height;
+
+                // preserve camera viewport center for manual zoom/pan mode
+                if (state->zoom_mode == ZoomMode::Percent) {
+                    // old source rect
+                    uint32_t old_src_w = (uint32_t)((float)state->width / state->zoom);
+                    uint32_t old_src_h = (uint32_t)((float)state->height / state->zoom);
+                    if (old_src_w > state->width)
+                        old_src_w = state->width;
+                    if (old_src_h > state->height)
+                        old_src_h = state->height;
+                    int old_src_x = state->pan_x;
+                    int old_src_y = state->pan_y;
+                    float center_x = old_src_x + old_src_w * 0.5f;
+                    float center_y = old_src_y + old_src_h * 0.5f;
+
+                    state->win_w = new_win_w;
+                    state->win_h = new_win_h;
+
+                    // new source rect (same zoom)
+                    uint32_t new_src_w = (uint32_t)((float)state->width / state->zoom);
+                    uint32_t new_src_h = (uint32_t)((float)state->height / state->zoom);
+                    if (new_src_w > state->width)
+                        new_src_w = state->width;
+                    if (new_src_h > state->height)
+                        new_src_h = state->height;
+
+                    state->pan_x = (int)(center_x - new_src_w * 0.5f);
+                    state->pan_y = (int)(center_y - new_src_h * 0.5f);
+
+                    int max_x = (int)state->width - (int)new_src_w;
+                    int max_y = (int)state->height - (int)new_src_h;
+                    if (state->pan_x < 0)
+                        state->pan_x = 0;
+                    if (state->pan_y < 0)
+                        state->pan_y = 0;
+                    if (state->pan_x > max_x)
+                        state->pan_x = max_x;
+                    if (state->pan_y > max_y)
+                        state->pan_y = max_y;
                 }
-                else if (ev.type == ButtonPress) {
-                    input_handle_button(state, &ev.xbutton);
+                else {
+                    state->win_w = new_win_w;
+                    state->win_h = new_win_h;
                 }
-                else if (ev.type == ButtonRelease) {
-                    input_handle_button_release(state, &ev.xbutton);
-                }
-                else if (ev.type == MotionNotify) {
-                    input_handle_motion(state, &ev.xmotion);
-                }
-                else if (ev.type == ConfigureNotify) {
-                    int new_win_w = ev.xconfigure.width - state->panel_width;
-                    int new_win_h = ev.xconfigure.height;
 
-                    // preserve camera viewport center for manual zoom/pan mode
-                    if (state->zoom_mode == ZoomMode::Percent) {
-                        // old source rect
-                        uint32_t old_src_w = (uint32_t)((float)state->width / state->zoom);
-                        uint32_t old_src_h = (uint32_t)((float)state->height / state->zoom);
-                        if (old_src_w > state->width)
-                            old_src_w = state->width;
-                        if (old_src_h > state->height)
-                            old_src_h = state->height;
-                        int old_src_x = state->pan_x;
-                        int old_src_y = state->pan_y;
-                        float center_x = old_src_x + old_src_w * 0.5f;
-                        float center_y = old_src_y + old_src_h * 0.5f;
+                // recreate XImage / shared memory if window size changed
+                if (ui.ximg &&
+                    (ui.ximg->width != state->win_w || ui.ximg->height != state->win_h)) {
+                    // clean up previous image/shm
+                    shm_cleanup();
 
-                        state->win_w = new_win_w;
-                        state->win_h = new_win_h;
-
-                        // new source rect (same zoom)
-                        uint32_t new_src_w = (uint32_t)((float)state->width / state->zoom);
-                        uint32_t new_src_h = (uint32_t)((float)state->height / state->zoom);
-                        if (new_src_w > state->width)
-                            new_src_w = state->width;
-                        if (new_src_h > state->height)
-                            new_src_h = state->height;
-
-                        state->pan_x = (int)(center_x - new_src_w * 0.5f);
-                        state->pan_y = (int)(center_y - new_src_h * 0.5f);
-
-                        int max_x = (int)state->width - (int)new_src_w;
-                        int max_y = (int)state->height - (int)new_src_h;
-                        if (state->pan_x < 0)
-                            state->pan_x = 0;
-                        if (state->pan_y < 0)
-                            state->pan_y = 0;
-                        if (state->pan_x > max_x)
-                            state->pan_x = max_x;
-                        if (state->pan_y > max_y)
-                            state->pan_y = max_y;
+                    // attempt to re-init XShm with new window size
+                    ui.shm_available = shm_init(state);
+                    if (ui.shm_available) {
+                        // if we previously had a fallback rgb buffer, free it
+                        if (ui.rgb_buf) {
+                            free(ui.rgb_buf);
+                            ui.rgb_buf = nullptr;
+                            ui.rgb_size = 0;
+                        }
                     }
                     else {
-                        state->win_w = new_win_w;
-                        state->win_h = new_win_h;
-                    }
-
-                    // recreate XImage / shared memory if window size changed
-                    if (ui.ximg &&
-                        (ui.ximg->width != state->win_w || ui.ximg->height != state->win_h)) {
-                        // clean up previous image/shm
-                        shm_cleanup();
-
-                        // attempt to re-init XShm with new window size
-                        ui.shm_available = shm_init(state);
-                        if (ui.shm_available) {
-                            // if we previously had a fallback rgb buffer, free it
-                            if (ui.rgb_buf) {
-                                free(ui.rgb_buf);
-                                ui.rgb_buf = nullptr;
-                                ui.rgb_size = 0;
-                            }
-                        }
-                        else {
-                            LOG_DEBUG("XShm unavailable after resize, falling back to XPutImage");
-                            int screen = DefaultScreen(ui.dpy);
-                            Visual* vis = DefaultVisual(ui.dpy, screen);
-                            int depth = DefaultDepth(ui.dpy, screen);
-                            ui.rgb_size = (size_t)state->win_w * state->win_h * 4;
-                            ui.rgb_buf = (unsigned char*)realloc(ui.rgb_buf, ui.rgb_size);
-                            ui.ximg =
-                                XCreateImage(ui.dpy, vis, depth, ZPixmap, 0, (char*)ui.rgb_buf,
-                                             state->win_w, state->win_h, 32, 0);
-                        }
+                        LOG_DEBUG("XShm unavailable after resize, falling back to XPutImage");
+                        int screen = DefaultScreen(ui.dpy);
+                        Visual* vis = DefaultVisual(ui.dpy, screen);
+                        int depth = DefaultDepth(ui.dpy, screen);
+                        ui.rgb_size = (size_t)state->win_w * state->win_h * 4;
+                        ui.rgb_buf = (unsigned char*)realloc(ui.rgb_buf, ui.rgb_size);
+                        ui.ximg =
+                            XCreateImage(ui.dpy, vis, depth, ZPixmap, 0, (char*)ui.rgb_buf,
+                                         state->win_w, state->win_h, 32, 0);
                     }
                 }
             }
@@ -778,56 +837,13 @@ int ui_run(AppState* state)
             prev_fullscreen = state->fullscreen;
         }
 
-        // compute src region for current zoom/pan
-        uint32_t src_w, src_h;
-        int src_x, src_y;
-
-        if (state->zoom_mode == ZoomMode::Fit || state->zoom_mode == ZoomMode::Fill) {
-            // fit: scale so the whole frame fits in the window
-            float scale_x = (float)state->win_w / (float)state->width;
-            float scale_y = (float)state->win_h / (float)state->height;
-            float scale = (state->zoom_mode == ZoomMode::Fill)
-                              ? (scale_x > scale_y ? scale_x : scale_y)
-                              : (scale_x < scale_y ? scale_x : scale_y);
-            src_w = state->width;
-            src_h = state->height;
-            src_x = 0;
-            src_y = 0;
-            state->zoom = scale;
-        }
-        else {
-            // manual percent zoom — src region is a crop of the frame
-            float inv = 1.0f / state->zoom;
-            src_w = (uint32_t)((float)state->width * inv);
-            src_h = (uint32_t)((float)state->height * inv);
-
-            // never exceed actual frame dimensions
-            if (src_w > state->width)
-                src_w = state->width;
-            if (src_h > state->height)
-                src_h = state->height;
-
-            // clamp pan so we never go out of frame
-            // clamp pan so we never go out of frame
-            int max_x = (int)state->width - (int)src_w;
-            int max_y = (int)state->height - (int)src_h;
-            if (state->pan_x < 0)
-                state->pan_x = 0;
-            if (state->pan_y < 0)
-                state->pan_y = 0;
-            if (state->pan_x > max_x)
-                state->pan_x = max_x;
-            if (state->pan_y > max_y)
-                state->pan_y = max_y;
-            src_x = state->pan_x;
-            src_y = state->pan_y;
-        }
+        SourceRegion src = current_source_region(state);
 
         pthread_mutex_lock(&ui.last_rgb_mutex);
         if (ui.frame_available)
             ui.frame_available = 0;
         if (ui.last_rgb)
-            present_frame_static(state, ui.last_rgb, src_w, src_h, src_x, src_y);
+            present_frame_static(state, ui.last_rgb, src.w, src.h, src.x, src.y);
         pthread_mutex_unlock(&ui.last_rgb_mutex);
     }
 
