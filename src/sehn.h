@@ -26,6 +26,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #pragma once
 
 #include <cstdint>
+#include <csignal>
 #include <ctime>
 #include <string>
 
@@ -94,9 +95,9 @@ struct AppState {
     int wb_temp;
 
     // --- signals ---
-    volatile bool sig_capture;
-    volatile bool sig_next_mode;
-    volatile bool sig_reload_config;
+    volatile sig_atomic_t sig_capture;
+    volatile sig_atomic_t sig_next_mode;
+    volatile sig_atomic_t sig_reload_config;
 
     // --- early exit flags ---
     bool list_devices_and_exit;

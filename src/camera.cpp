@@ -35,6 +35,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <poll.h>
 
 // one CameraState per app, lives here
 static CameraState cam = {};
@@ -330,20 +331,14 @@ const void* camera_next_frame(AppState* state, size_t* out_size)
     (void)state;
 
     // wait for a frame with 2s timeout
-    fd_set fds;
-    FD_ZERO(&fds);
-    FD_SET(cam.fd, &fds);
-    struct timeval tv = {.tv_sec = 2, .tv_usec = 0};
+    // poll with short timeout so signals don't kill us
+    struct pollfd pfd = { cam.fd, POLLIN, 0 };
+    int r;
+    do {
+        r = poll(&pfd, 1, 500);  // 500ms timeout
+    } while (r < 0 && errno == EINTR);
 
-    int r = select(cam.fd + 1, &fds, nullptr, nullptr, &tv);
-    if (r < 0) {
-        if (errno == EINTR)
-            return nullptr; // signal interrupted, not an error
-        perror("select");
-        return nullptr;
-    }
-    if (r == 0)
-        return nullptr; // timeout, silent
+    if (r < 0 || r == 0) return nullptr;
 
     struct v4l2_buffer buf = {};
     buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;

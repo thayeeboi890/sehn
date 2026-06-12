@@ -51,12 +51,21 @@ static void handle_sighup(int)
         g_state->sig_reload_config = true;
 }
 
-void signals_init(AppState* state)
-{
+void signals_init(AppState *state) {
     g_state = state;
-    std::signal(SIGUSR1, handle_sigusr1);
-    std::signal(SIGUSR2, handle_sigusr2);
-    std::signal(SIGHUP, handle_sighup);
+
+    struct sigaction sa = {};
+    sa.sa_flags = SA_RESTART;  // restart interrupted syscalls automatically
+    sigemptyset(&sa.sa_mask);
+
+    sa.sa_handler = handle_sigusr1;
+    sigaction(SIGUSR1, &sa, nullptr);
+
+    sa.sa_handler = handle_sigusr2;
+    sigaction(SIGUSR2, &sa, nullptr);
+
+    sa.sa_handler = handle_sighup;
+    sigaction(SIGHUP, &sa, nullptr);
 }
 
 void signals_dispatch(AppState* state)

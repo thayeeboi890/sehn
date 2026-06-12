@@ -32,6 +32,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "signals.h"
 #include "video.h"
 
+#include <cerrno>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -568,6 +569,8 @@ int ui_run(AppState* state)
         struct timeval tv = {0, 20000}; // 20ms
         int sel = select(xfd + 1, &rfds, nullptr, nullptr, &tv);
         if (sel < 0) {
+            if (errno == EINTR)
+                continue;
             perror("select");
             break;
         }
