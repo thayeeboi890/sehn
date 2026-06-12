@@ -102,21 +102,21 @@ static void camera_probe_controls(int fd)
         if (qc.type == V4L2_CTRL_TYPE_INTEGER || qc.type == V4L2_CTRL_TYPE_BOOLEAN ||
             qc.type == V4L2_CTRL_TYPE_MENU) {
 
-            if (contains_ci(qc.name, "pan")) {
+            if (qc.id == V4L2_CID_PAN_ABSOLUTE) {
                 pan_ctrl.id = qc.id;
                 pan_ctrl.minimum = qc.minimum;
                 pan_ctrl.maximum = qc.maximum;
                 pan_ctrl.step = qc.step;
                 pan_ctrl.valid = true;
             }
-            else if (contains_ci(qc.name, "tilt")) {
+            else if (qc.id == V4L2_CID_TILT_ABSOLUTE) {
                 tilt_ctrl.id = qc.id;
                 tilt_ctrl.minimum = qc.minimum;
                 tilt_ctrl.maximum = qc.maximum;
                 tilt_ctrl.step = qc.step;
                 tilt_ctrl.valid = true;
             }
-            else if (contains_ci(qc.name, "zoom")) {
+            else if (qc.id == V4L2_CID_ZOOM_ABSOLUTE) {
                 zoom_ctrl.id = qc.id;
                 zoom_ctrl.minimum = qc.minimum;
                 zoom_ctrl.maximum = qc.maximum;
@@ -137,29 +137,27 @@ static void camera_probe_controls(int fd)
                 exposure_auto_ctrl.step = qc.step;
                 exposure_auto_ctrl.valid = true;
             }
-            else if (contains_ci(qc.name, "gain")) {
+            else if (qc.id == V4L2_CID_GAIN) {
                 gain_ctrl.id = qc.id;
                 gain_ctrl.minimum = qc.minimum;
                 gain_ctrl.maximum = qc.maximum;
                 gain_ctrl.step = qc.step;
                 gain_ctrl.valid = true;
             }
-            else if (contains_ci(qc.name, "white") || contains_ci(qc.name, "wb") ||
-                     contains_ci(qc.name, "balance")) {
+            else if (qc.id == V4L2_CID_WHITE_BALANCE_TEMPERATURE) {
                 wb_ctrl.id = qc.id;
                 wb_ctrl.minimum = qc.minimum;
                 wb_ctrl.maximum = qc.maximum;
                 wb_ctrl.step = qc.step;
                 wb_ctrl.valid = true;
             }
-            else if (contains_ci(qc.name, "focus") && qc.type == V4L2_CTRL_TYPE_BOOLEAN) {
+            else if (qc.id == V4L2_CID_FOCUS_AUTO) {
                 autofocus_ctrl.id = qc.id;
                 autofocus_ctrl.minimum = qc.minimum;
                 autofocus_ctrl.maximum = qc.maximum;
                 autofocus_ctrl.step = qc.step;
                 autofocus_ctrl.valid = true;
-            }
-        }
+            }        }
 
         qc.id |= V4L2_CTRL_FLAG_NEXT_CTRL | V4L2_CTRL_FLAG_NEXT_COMPOUND;
     }

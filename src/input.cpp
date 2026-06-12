@@ -208,27 +208,39 @@ static void do_action(AppState* state, Action action)
     }
 }
 
+static Action lookup_keysym_action(const KeyMap& km, KeySym sym)
+{
+    Action action = keys_lookup(km, sym);
+    if (action != Action::Unknown)
+        return action;
+
+    KeySym lower = NoSymbol;
+    KeySym upper = NoSymbol;
+    XConvertCase(sym, &lower, &upper);
+
+    action = keys_lookup(km, lower);
+    if (action != Action::Unknown)
+        return action;
+
+    return keys_lookup(km, upper);
+}
+
 static Action lookup_key_action(const KeyMap& km, XKeyEvent* ev)
 {
+    KeySym typed = NoSymbol;
+    char buf[32];
+    XLookupString(ev, buf, sizeof(buf), &typed, nullptr);
+    Action action = lookup_keysym_action(km, typed);
+    if (action != Action::Unknown)
+        return action;
+
     KeySym syms[] = {
         XLookupKeysym(ev, 0),
         XLookupKeysym(ev, 1),
     };
 
     for (KeySym sym : syms) {
-        Action action = keys_lookup(km, sym);
-        if (action != Action::Unknown)
-            return action;
-
-        KeySym lower = NoSymbol;
-        KeySym upper = NoSymbol;
-        XConvertCase(sym, &lower, &upper);
-
-        action = keys_lookup(km, lower);
-        if (action != Action::Unknown)
-            return action;
-
-        action = keys_lookup(km, upper);
+        action = lookup_keysym_action(km, sym);
         if (action != Action::Unknown)
             return action;
     }
