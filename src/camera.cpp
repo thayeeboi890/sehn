@@ -450,6 +450,18 @@ void camera_zoom_rel(float delta)
     }
 }
 
+void camera_zoom_reset()
+{
+    if (cam.fd < 0 || !zoom_ctrl.valid)
+        return;
+
+    struct v4l2_control ctrl = {};
+    ctrl.id = zoom_ctrl.id;
+    ctrl.value = (int)zoom_ctrl.minimum;
+    if (xioctl(cam.fd, VIDIOC_S_CTRL, &ctrl) < 0)
+        perror("VIDIOC_S_CTRL zoom_reset");
+}
+
 void camera_set_pan_tilt_frac(float pan_frac, float tilt_frac)
 {
     if (cam.fd < 0)
@@ -591,7 +603,7 @@ void camera_apply_controls(AppState* state)
     }
 
     // ZOOM (legacy)
-    if (zoom_ctrl.valid) {
+    if (zoom_ctrl.valid && state->zoom_mode == ZoomMode::Percent) {
         float z = state->zoom;
         if (z != last_zoom) {
             struct v4l2_control ctrl = {};

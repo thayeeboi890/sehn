@@ -62,7 +62,6 @@ enum class Action {
     WBWarmer,
     WBCooler,
     ToggleAutofocus,
-    ToggleInfo,
 };
 
 // keybinding table: X11 KeySym -> Action

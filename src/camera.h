@@ -54,6 +54,7 @@ bool camera_has_zoom();
 
 void camera_pan_rel(int dx, int dy); /* dx/dy in UI-pan steps (±1) */
 void camera_zoom_rel(float delta);   /* delta is zoom multiplier delta */
+void camera_zoom_reset();
 
 /* Set absolute pan/tilt as fractions 0.0..1.0 of their ranges */
 void camera_set_pan_tilt_frac(float pan_frac, float tilt_frac);

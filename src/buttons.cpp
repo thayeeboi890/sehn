@@ -47,7 +47,11 @@ bool buttons_handle_button_event(AppState* state, XButtonEvent* ev)
 
     // Middle click -> reset to Fit (keeps zoom middle-click behavior)
     if (btn == 2) {
+        if (camera_has_zoom())
+            camera_zoom_reset();
         state->zoom_mode = ZoomMode::Fit;
+        state->pan_x = 0;
+        state->pan_y = 0;
         return true;
     }
 

@@ -104,7 +104,11 @@ static void do_action(AppState* state, Action action)
         }
         break;
     case Action::ZoomFit:
+        if (camera_has_zoom())
+            camera_zoom_reset();
         state->zoom_mode = ZoomMode::Fit;
+        state->pan_x = 0;
+        state->pan_y = 0;
         break;
     case Action::ZoomFill:
         state->zoom_mode = ZoomMode::Fill;
@@ -200,29 +204,9 @@ static void do_action(AppState* state, Action action)
         state->autofocus = !state->autofocus;
         camera_apply_controls(state);
         break;
-    case Action::ToggleInfo:
-        state->overlay_visible = !state->overlay_visible;
-        break;
     default:
         break;
     }
-}
-
-static Action lookup_keysym_action(const KeyMap& km, KeySym sym)
-{
-    Action action = keys_lookup(km, sym);
-    if (action != Action::Unknown)
-        return action;
-
-    KeySym lower = NoSymbol;
-    KeySym upper = NoSymbol;
-    XConvertCase(sym, &lower, &upper);
-
-    action = keys_lookup(km, lower);
-    if (action != Action::Unknown)
-        return action;
-
-    return keys_lookup(km, upper);
 }
 
 static Action lookup_key_action(const KeyMap& km, XKeyEvent* ev)
@@ -230,17 +214,19 @@ static Action lookup_key_action(const KeyMap& km, XKeyEvent* ev)
     KeySym typed = NoSymbol;
     char buf[32];
     XLookupString(ev, buf, sizeof(buf), &typed, nullptr);
-    Action action = lookup_keysym_action(km, typed);
+    Action action = keys_lookup(km, typed);
     if (action != Action::Unknown)
         return action;
 
-    KeySym syms[] = {
-        XLookupKeysym(ev, 0),
-        XLookupKeysym(ev, 1),
-    };
+    KeySym syms[2];
+    int sym_count = 0;
+    if (ev->state & ShiftMask)
+        syms[sym_count++] = XLookupKeysym(ev, 1);
+    else
+        syms[sym_count++] = XLookupKeysym(ev, 0);
 
-    for (KeySym sym : syms) {
-        action = lookup_keysym_action(km, sym);
+    for (int i = 0; i < sym_count; i++) {
+        action = keys_lookup(km, syms[i]);
         if (action != Action::Unknown)
             return action;
     }
@@ -290,7 +276,11 @@ void input_handle_button(AppState* state, XButtonEvent* ev)
 
     if (btn == 2) {
         // middle click -> reset to fit
+        if (camera_has_zoom())
+            camera_zoom_reset();
         state->zoom_mode = ZoomMode::Fit;
+        state->pan_x = 0;
+        state->pan_y = 0;
         ui_present_current_frame(state);
         return;
     }

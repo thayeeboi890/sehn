@@ -57,7 +57,6 @@ KeyMap keys_defaults()
     km[XK_c] = Action::Capture;
     km[XK_m] = Action::NextMode;
     km[XK_M] = Action::PrevMode;
-    km[XK_Tab] = Action::TogglePanel;
     km[XK_o] = Action::ToggleOverlay;
     km[XK_f] = Action::ToggleFullscreen;
     km[XK_plus] = Action::ZoomIn;
@@ -66,8 +65,6 @@ KeyMap keys_defaults()
     km[XK_minus] = Action::ZoomOut;
     km[XK_KP_Subtract] = Action::ZoomOut; /* keypad - */
     km[XK_z] = Action::ZoomFit;
-    km[XK_Z] = Action::ZoomFill;
-    km[XK_asterisk] = Action::Zoom100;
     km[XK_Left] = Action::PanLeft;
     km[XK_Right] = Action::PanRight;
     km[XK_Up] = Action::PanUp;
@@ -85,7 +82,6 @@ KeyMap keys_defaults()
     km[XK_comma] = Action::WBCooler;
     km[XK_period] = Action::WBWarmer;
     km[XK_a] = Action::ToggleAutofocus;
-    km[XK_i] = Action::ToggleInfo;
     return km;
 }
 
@@ -152,8 +148,6 @@ static Action action_from_str(const char* s)
         return Action::WBCooler;
     if (strcmp(s, "toggle_autofocus") == 0)
         return Action::ToggleAutofocus;
-    if (strcmp(s, "toggle_info") == 0)
-        return Action::ToggleInfo;
     return Action::Unknown;
 }
 

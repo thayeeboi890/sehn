@@ -543,61 +543,6 @@ void ui_present_current_frame(AppState* state)
     pthread_mutex_unlock(&ui.last_rgb_mutex);
 }
 
-static void handle_key(AppState* state, XKeyEvent* ev)
-{
-    KeySym sym = XLookupKeysym(ev, 0);
-    switch (sym) {
-    case XK_q:
-    case XK_Escape:
-        state->running = false;
-        break;
-    case XK_space:
-    case XK_c: {
-        size_t frame_size = 0;
-        const void* frame = camera_next_frame(state, &frame_size);
-        if (frame) {
-            if (state->mode == Mode::Burst)
-                capture_burst(state);
-            else if (state->mode == Mode::Video) {
-                if (!state->recording) {
-                    capture_video_start(state);
-                    state->recording = true;
-                }
-                else {
-                    state->recording = false;
-                    usleep(50000);
-                    capture_video_stop(state);
-                }
-            }
-            else {
-                capture_photo(state, frame, frame_size);
-            }
-        }
-        break;
-    }
-    case XK_m:
-        // cycle mode forward
-        state->mode = (Mode)(((int)state->mode + 1) % 4);
-        break;
-    case XK_M:
-        // cycle mode backward
-        state->mode = (Mode)(((int)state->mode + 3) % 4);
-        break;
-    case XK_f:
-        // TODO: toggle fullscreen
-        state->fullscreen = !state->fullscreen;
-        break;
-    case XK_Tab:
-        state->panel_visible = !state->panel_visible;
-        break;
-    case XK_o:
-        state->overlay_visible = !state->overlay_visible;
-        break;
-    default:
-        break;
-    }
-}
-
 // ── main loop ────────────────────────────────────────────────────────────────
 
 int ui_run(AppState* state)
