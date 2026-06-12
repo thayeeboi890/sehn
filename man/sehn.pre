@@ -163,9 +163,7 @@ Default: 30.
 .It Cm \-F , \-\-fullscreen
 .
 Open the viewfinder in fullscreen mode.
-The panel is hidden by default in this mode; press
-.Cm Tab
-to toggle it.
+The panel is hidden by default in this mode.
 .
 .It Cm \-x , \-\-borderless
 .
@@ -550,10 +548,6 @@ Cycle to the next capture mode.
 .
 Cycle to the previous capture mode.
 .
-.It Cm Tab Bq toggle_panel
-.
-Toggle the right-side panel.
-.
 .It Cm o Bq toggle_overlay
 .
 Toggle the info overlay.
@@ -565,14 +559,6 @@ Toggle fullscreen.
 .It Cm z Bq zoom_fit
 .
 Zoom viewfinder to fit window.
-.
-.It Cm Z Bq zoom_fill
-.
-Zoom viewfinder to fill window.
-.
-.It Cm * Bq zoom_100
-.
-Set zoom to 100%.
 .
 .It Cm + , Ao keypad + Ac Bq zoom_in
 .
@@ -625,10 +611,6 @@ Shift white balance temperature cooler or warmer.
 .It Cm a Bq toggle_autofocus
 .
 Toggle autofocus, if supported.
-.
-.It Cm i Bq toggle_info
-.
-Toggle the device info panel showing current V4L2 control values.
 .
 .It Cm l Bq list_devices
 .
@@ -769,12 +751,9 @@ zoom = "fit"
 capture       = "space"
 next_mode     = "m"
 prev_mode     = "M"
-toggle_panel  = "Tab"
 toggle_overlay = "o"
 toggle_fullscreen = "f"
 zoom_fit      = "z"
-zoom_fill     = "Z"
-zoom_100      = "asterisk"
 zoom_in       = "plus"
 zoom_out      = "minus"
 quit          = "q"
