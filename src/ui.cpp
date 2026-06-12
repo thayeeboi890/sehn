@@ -351,15 +351,99 @@ static void rgb_to_ximage_region(const uint8_t* rgb, uint32_t src_stride, uint32
     }
 }
 
+static void apply_transform_region(const uint8_t* src, uint8_t* dst, uint32_t src_stride,
+                                   uint32_t src_height, int src_x, int src_y, uint32_t src_w,
+                                   uint32_t src_h, bool flip_h, bool flip_v, int rotate_deg)
+{
+    uint32_t out_w = src_w;
+    uint32_t out_h = src_h;
+    if (rotate_deg == 90 || rotate_deg == 270) {
+        out_w = src_h;
+        out_h = src_w;
+    }
+
+    for (uint32_t dy = 0; dy < out_h; dy++) {
+        for (uint32_t dx = 0; dx < out_w; dx++) {
+            uint32_t local_x, local_y;
+
+            if (rotate_deg == 0) {
+                local_x = dx;
+                local_y = dy;
+            }
+            else if (rotate_deg == 90) {
+                local_x = dy;
+                local_y = src_h - 1 - dx;
+            }
+            else if (rotate_deg == 180) {
+                local_x = src_w - 1 - dx;
+                local_y = src_h - 1 - dy;
+            }
+            else {
+                local_x = src_w - 1 - dy;
+                local_y = dx;
+            }
+
+            if (flip_h)
+                local_x = src_w - 1 - local_x;
+            if (flip_v)
+                local_y = src_h - 1 - local_y;
+
+            uint32_t sx = (uint32_t)src_x + local_x;
+            uint32_t sy = (uint32_t)src_y + local_y;
+            if (sx >= src_stride)
+                sx = src_stride - 1;
+            if (sy >= src_height)
+                sy = src_height - 1;
+
+            const uint8_t* p = src + (sy * src_stride + sx) * 3;
+            uint8_t* q = dst + (dy * out_w + dx) * 3;
+            q[0] = p[0];
+            q[1] = p[1];
+            q[2] = p[2];
+        }
+    }
+}
+
 // helper to present an RGB frame given a source rect
 static void present_frame_static(AppState* state, uint8_t* frame_rgb, uint32_t p_src_w,
                                  uint32_t p_src_h, int p_src_x, int p_src_y)
 {
     if (!frame_rgb)
         return;
+
+    uint8_t* presented = frame_rgb;
+    uint8_t* tmp = nullptr;
+    uint32_t src_stride = state->width;
+    uint32_t src_height = state->height;
+    uint32_t present_w = p_src_w;
+    uint32_t present_h = p_src_h;
+    int present_x = p_src_x;
+    int present_y = p_src_y;
+
+    if (state->flip_horizontal || state->flip_vertical || state->rotate_deg != 0) {
+        uint32_t transformed_w = p_src_w;
+        uint32_t transformed_h = p_src_h;
+        if (state->rotate_deg == 90 || state->rotate_deg == 270) {
+            transformed_w = p_src_h;
+            transformed_h = p_src_w;
+        }
+        tmp = (uint8_t*)malloc((size_t)transformed_w * transformed_h * 3);
+        if (tmp) {
+            apply_transform_region(frame_rgb, tmp, state->width, state->height, p_src_x, p_src_y,
+                                   p_src_w, p_src_h, state->flip_horizontal,
+                                   state->flip_vertical, state->rotate_deg);
+            presented = tmp;
+            src_stride = transformed_w;
+            src_height = transformed_h;
+            present_w = transformed_w;
+            present_h = transformed_h;
+            present_x = 0;
+            present_y = 0;
+        }
+    }
     int dst_w = state->win_w;
     int dst_h = state->win_h;
-    float src_aspect = (float)p_src_w / (float)p_src_h;
+    float src_aspect = (float)present_w / (float)present_h;
     float win_aspect = (float)state->win_w / (float)state->win_h;
     int dst_img_w, dst_img_h;
     if (win_aspect > src_aspect) {
@@ -373,8 +457,8 @@ static void present_frame_static(AppState* state, uint8_t* frame_rgb, uint32_t p
     int dst_x = (state->win_w - dst_img_w) / 2;
     int dst_y = (state->win_h - dst_img_h) / 2;
 
-    rgb_to_ximage_region(frame_rgb, state->width, state->height, p_src_x, p_src_y, p_src_w, p_src_h,
-                         dst_x, dst_y, dst_img_w, dst_img_h);
+    rgb_to_ximage_region(presented, src_stride, src_height, present_x, present_y, present_w,
+                         present_h, dst_x, dst_y, dst_img_w, dst_img_h);
     if (ui.shm_available)
         XShmPutImage(ui.dpy, ui.win, ui.gc, ui.ximg, 0, 0, 0, 0, dst_w, dst_h, False);
     else
@@ -384,6 +468,8 @@ static void present_frame_static(AppState* state, uint8_t* frame_rgb, uint32_t p
     if (state->overlay_visible)
         overlay_draw(state, ui.dpy, ui.win, ui.gc);
     XFlush(ui.dpy);
+    if (tmp)
+        free(tmp);
 }
 
 // ── input handling ────────────────────────────────────────────────────────────

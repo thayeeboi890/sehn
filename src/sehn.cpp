@@ -43,6 +43,9 @@ AppState make_default_state()
     s.panel_visible = true;
     s.overlay_visible = false;
     s.hide_pointer = false;
+    s.flip_horizontal = false;
+    s.flip_vertical = false;
+    s.rotate_deg = 0;
     s.panel_width = 64;
     s.win_w = 960;
     s.win_h = 540;

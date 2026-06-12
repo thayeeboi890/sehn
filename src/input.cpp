@@ -152,14 +152,16 @@ static void do_action(AppState* state, Action action)
         }
         break;
     case Action::FlipHorizontal:
-        // TODO: flip flag on state
+        state->flip_horizontal = !state->flip_horizontal;
         break;
     case Action::FlipVertical:
-        // TODO: flip flag on state
+        state->flip_vertical = !state->flip_vertical;
         break;
     case Action::RotateCW:
+        state->rotate_deg = (state->rotate_deg + 90) % 360;
+        break;
     case Action::RotateCCW:
-        // TODO: rotation flag on state
+        state->rotate_deg = (state->rotate_deg + 270) % 360;
         break;
     case Action::ToggleExposure:
         state->exposure_mode = (state->exposure_mode == "auto") ? "manual" : "auto";

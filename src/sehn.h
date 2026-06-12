@@ -75,6 +75,9 @@ struct AppState {
     ZoomMode zoom_mode;
     float zoom;
     int pan_x, pan_y;
+    bool        flip_horizontal;
+    bool        flip_vertical;
+    int         rotate_deg;
 
     // --- capture ---
     std::string output_dir;
