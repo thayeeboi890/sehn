@@ -22,8 +22,9 @@ libav_dep = dependency('libavcodec')
 libavf_dep = dependency('libavformat')
 libavu_dep = dependency('libavutil')
 libavs_dep = dependency('libswscale')
+libpulse_dep = dependency('libpulse')
 
-deps = [x11_dep, xext_dep, libjpeg_dep, libpng_dep, v4l2_dep, toml_dep, libav_dep, libavf_dep, libavu_dep, libavs_dep]
+deps = [x11_dep, xext_dep, libjpeg_dep, libpng_dep, v4l2_dep, toml_dep, libav_dep, libavf_dep, libavu_dep, libavs_dep, libpulse_dep]
 
 if libexif_dep.found()
   deps += libexif_dep
