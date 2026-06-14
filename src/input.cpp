@@ -51,8 +51,8 @@ static void do_action(AppState* state, Action action)
             capture_burst(state);
         else if (state->mode == Mode::Video) {
             if (!state->recording) {
-                capture_video_start(state);
-                state->recording = true;
+                if (capture_video_start(state) == 0)
+                    state->recording = true;
             }
             else {
                 state->recording = false;

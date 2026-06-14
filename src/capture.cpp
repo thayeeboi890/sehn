@@ -28,6 +28,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "exif.h"
 #include "utils.h"
 #include "video.h"
+#include "audio.h"
 
 #include <cerrno>
 #include <cstdio>
@@ -267,12 +268,21 @@ void capture_burst(AppState* state)
     LOG_INFO("burst done");
 }
 
-int capture_video_start(AppState* state)
-{
-    LOG_FN();
+int capture_video_start(AppState *state) {
     char path[1024];
-    capture_build_filename(state, path, sizeof(path), state->video_format.c_str());
-    return video_open(state, path);
+    capture_build_filename(state, path, sizeof(path),
+                           state->video_format.c_str());
+    if (video_open(state, path) < 0) return -1;
+    bool has_audio = audio_open(state) == 0;  // non-fatal if it fails
+    if (video_start(state) < 0) {
+        if (has_audio)
+            audio_close(state);
+        video_close(state);
+        return -1;
+    }
+    if (has_audio)
+        audio_start(state);
+    return 0;
 }
 
 void capture_video_frame(AppState* state, const void* frame, size_t frame_size)
@@ -280,4 +290,7 @@ void capture_video_frame(AppState* state, const void* frame, size_t frame_size)
     video_write_frame(state, frame, frame_size);
 }
 
-void capture_video_stop(AppState* state) { video_close(state); }
+void capture_video_stop(AppState *state) {
+    audio_close(state);
+    video_close(state);
+}

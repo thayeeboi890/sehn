@@ -1,4 +1,4 @@
-/* video.h
+/* audio.h
 
 Copyright (C) 2026 Santiago Silva.
 
@@ -26,34 +26,16 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #pragma once
 
 #include "sehn.h"
-#include <cstddef>
-extern "C" {
-#include <libavcodec/packet.h>
-#include <libavformat/avformat.h>
-#include <libavutil/rational.h>
-}
 
-// Open output file and initialize encoder.
+// Initialize audio capture. Call after video_open().
 // Returns 0 on success, -1 on failure.
-int video_open(AppState* state, const char* path);
+int  audio_open(AppState *state);
 
-// Write the output header after all streams have been added.
-int video_start(AppState* state);
+// Start the capture thread after the container header has been written.
+int  audio_start(AppState *state);
 
-// Encode and write one raw frame.
-// data/size is the raw V4L2 frame (MJPEG or YUYV).
-void video_write_frame(AppState* state, const void* data, size_t size);
+// Stop capture, flush encoder, close stream.
+void audio_close(AppState *state);
 
-// Flush, write trailer, close file.
-void video_close(AppState* state);
-
-// return true if video is currently open (recording)
-bool vid_is_open();
-
-// Get the current AVCodecContext for the video encoder.
-AVFormatContext *vid_get_fmt_ctx();
-// Get the current time base of the video stream for timestamp calculations.
-AVRational vid_get_time_base();
-
-// Thread-safe muxer write for encoded audio/video packets.
-int vid_write_packet(AVPacket* pkt);
+// Returns true if audio is currently capturing.
+bool audio_is_open();

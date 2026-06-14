@@ -22,7 +22,7 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 */
-
+// TODO: yes
 #include "video.h"
 #include "capture.h"
 #include "utils.h"
@@ -31,6 +31,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <cstdlib>
 #include <cstring>
 #include <jpeglib.h>
+#include <mutex>
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -50,12 +51,16 @@ struct VideoState {
     SwsContext* sws_ctx;
     int64_t pts;
     bool open;
+    bool header_written;
     struct timespec start_ts;
     int64_t last_pts;
 };
 
 static VideoState vid = {};
+static std::mutex vid_mux_mutex;
 bool vid_is_open() { return vid.open; }
+AVFormatContext *vid_get_fmt_ctx()   { return vid.fmt_ctx; }
+AVRational       vid_get_time_base() { return vid.codec_ctx ? vid.codec_ctx->time_base : AVRational{1,30}; }
 
 // YUYV -> AVFrame (YUV420P)
 static void yuyv_to_yuv420(const uint8_t* yuyv, AVFrame* frame, uint32_t width, uint32_t height)
@@ -145,13 +150,6 @@ int video_open(AppState* state, const char* path)
         }
     }
 
-    // write header
-    ret = avformat_write_header(vid.fmt_ctx, nullptr);
-    if (ret < 0) {
-        LOG_ERROR("video: could not write header");
-        return -1;
-    }
-
     // allocate frame
     vid.frame = av_frame_alloc();
     vid.frame->format = AV_PIX_FMT_YUV420P;
@@ -169,9 +167,35 @@ int video_open(AppState* state, const char* path)
 
     vid.pts = 0;
     vid.last_pts = -1;
-    vid.open = true;
     LOG_INFO("recording to %s", path);
     return 0;
+}
+
+int video_start(AppState* state)
+{
+    LOG_FN();
+    (void)state;
+    if (!vid.fmt_ctx || vid.header_written)
+        return -1;
+
+    int ret = avformat_write_header(vid.fmt_ctx, nullptr);
+    if (ret < 0) {
+        LOG_ERROR("video: could not write header");
+        return -1;
+    }
+
+    vid.header_written = true;
+    vid.open = true;
+    return 0;
+}
+
+int vid_write_packet(AVPacket* pkt)
+{
+    if (!vid.fmt_ctx || !vid.header_written)
+        return -1;
+
+    std::lock_guard<std::mutex> lock(vid_mux_mutex);
+    return av_interleaved_write_frame(vid.fmt_ctx, pkt);
 }
 
 void video_write_frame(AppState* state, const void* data, size_t size)
@@ -236,7 +260,7 @@ void video_write_frame(AppState* state, const void* data, size_t size)
     while (avcodec_receive_packet(vid.codec_ctx, vid.pkt) == 0) {
         av_packet_rescale_ts(vid.pkt, vid.codec_ctx->time_base, vid.stream->time_base);
         vid.pkt->stream_index = vid.stream->index;
-        av_interleaved_write_frame(vid.fmt_ctx, vid.pkt);
+        vid_write_packet(vid.pkt);
         av_packet_unref(vid.pkt);
     }
 }
@@ -245,23 +269,32 @@ void video_close(AppState* state)
 {
     LOG_FN();
     (void)state;
-    if (!vid.open)
+    if (!vid.fmt_ctx)
         return;
 
     // flush encoder
-    avcodec_send_frame(vid.codec_ctx, nullptr);
-    while (avcodec_receive_packet(vid.codec_ctx, vid.pkt) == 0) {
-        av_packet_rescale_ts(vid.pkt, vid.codec_ctx->time_base, vid.stream->time_base);
-        vid.pkt->stream_index = vid.stream->index;
-        av_interleaved_write_frame(vid.fmt_ctx, vid.pkt);
-        av_packet_unref(vid.pkt);
+    if (vid.open && vid.codec_ctx && vid.pkt) {
+        avcodec_send_frame(vid.codec_ctx, nullptr);
+        while (avcodec_receive_packet(vid.codec_ctx, vid.pkt) == 0) {
+            av_packet_rescale_ts(vid.pkt, vid.codec_ctx->time_base, vid.stream->time_base);
+            vid.pkt->stream_index = vid.stream->index;
+            vid_write_packet(vid.pkt);
+            av_packet_unref(vid.pkt);
+        }
     }
 
-    av_write_trailer(vid.fmt_ctx);
-    avcodec_free_context(&vid.codec_ctx);
-    av_frame_free(&vid.frame);
-    av_packet_free(&vid.pkt);
-    sws_freeContext(vid.sws_ctx);
+    if (vid.header_written) {
+        std::lock_guard<std::mutex> lock(vid_mux_mutex);
+        av_write_trailer(vid.fmt_ctx);
+    }
+    if (vid.codec_ctx)
+        avcodec_free_context(&vid.codec_ctx);
+    if (vid.frame)
+        av_frame_free(&vid.frame);
+    if (vid.pkt)
+        av_packet_free(&vid.pkt);
+    if (vid.sws_ctx)
+        sws_freeContext(vid.sws_ctx);
     if (!(vid.fmt_ctx->oformat->flags & AVFMT_NOFILE))
         avio_closep(&vid.fmt_ctx->pb);
     avformat_free_context(vid.fmt_ctx);

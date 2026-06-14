@@ -16,6 +16,7 @@ sources = files(
   'input.cpp',
   'exif.cpp',
   'video.cpp',
+  'audio.cpp',
   'utils.cpp',
   'theme.cpp',
 )
