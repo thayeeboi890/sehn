@@ -21,6 +21,9 @@ png_compression = 6
 burst_count     = 10
 burst_interval  = 100
 
+[audio]
+device = ""
+
 [ui]
 theme         = "dark"
 mode          = "photo"

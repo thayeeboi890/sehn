@@ -129,8 +129,6 @@ static void *audio_thread_func(void *) {
 // ── public api ────────────────────────────────────────────────────────────────
 
 int audio_open(AppState *state) {
-    (void)state;
-
     AVFormatContext *fmt_ctx = vid_get_fmt_ctx();
     if (!fmt_ctx) {
         LOG_ERROR("audio: video not open, cannot add audio stream");
@@ -144,10 +142,11 @@ int audio_open(AppState *state) {
     ss.channels = AUDIO_CHANNELS;
 
     int pa_err = 0;
+    const char *source = state->audio_device.empty() ? nullptr : state->audio_device.c_str();
     aud.pa = pa_simple_new(nullptr,       // server
                            "sehn",        // app name
                            PA_STREAM_RECORD,
-                           nullptr,       // default source
+                           source,        // source, or default if nullptr
                            "capture",     // stream name
                            &ss,
                            nullptr,       // channel map

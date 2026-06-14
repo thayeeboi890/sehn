@@ -37,6 +37,7 @@ static void print_usage()
            "\n"
            "Options:\n"
            "  -d, --device <path>         camera device (default: /dev/video0)\n"
+           "  -a, --audio-device <name>   PulseAudio source (default: server default)\n"
            "  -o, --output-dir <dir>      save directory\n"
            "  -f, --format <fmt>          capture format: mjpeg, yuyv, nv12, h264\n"
            "  -r, --resolution <WxH>      capture resolution\n"
@@ -91,6 +92,7 @@ enum {
 
 static const struct option long_opts[] = {
     {"device", required_argument, nullptr, 'd'},
+    {"audio-device", required_argument, nullptr, 'a'},
     {"output-dir", required_argument, nullptr, 'o'},
     {"format", required_argument, nullptr, 'f'},
     {"resolution", required_argument, nullptr, 'r'},
@@ -127,10 +129,13 @@ int cli_parse(int argc, char* argv[], AppState* state)
 {
     LOG_FN();
     int opt;
-    while ((opt = getopt_long(argc, argv, "d:o:f:r:R:m:FxT:c:g:qVvh", long_opts, nullptr)) != -1) {
+    while ((opt = getopt_long(argc, argv, "d:a:o:f:r:R:m:FxT:c:g:qVvh", long_opts, nullptr)) != -1) {
         switch (opt) {
         case 'd':
             state->device = optarg;
+            break;
+        case 'a':
+            state->audio_device = optarg;
             break;
         case 'o':
             state->output_dir = optarg;

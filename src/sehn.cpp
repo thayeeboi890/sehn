@@ -61,6 +61,7 @@ AppState make_default_state()
     s.burst_count = 10;
     s.burst_interval_ms = 100;
     s.video_format = "mkv";
+    s.audio_device = "";
     s.autofocus = true;
     s.exposure_mode = "auto";
     s.exposure_time = 10000;

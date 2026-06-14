@@ -39,6 +39,20 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "utils.h"
 #include "version.h"
 
+static const char* find_config_arg(int argc, char* argv[])
+{
+    for (int i = 1; i < argc; ++i) {
+        if (strcmp(argv[i], "-c") == 0 || strcmp(argv[i], "--config") == 0) {
+            if (i + 1 < argc)
+                return argv[i + 1];
+            return nullptr;
+        }
+        if (strncmp(argv[i], "--config=", 9) == 0)
+            return argv[i] + 9;
+    }
+    return nullptr;
+}
+
 int main(int argc, char* argv[])
 {
     LOG_FN();
@@ -46,7 +60,10 @@ int main(int argc, char* argv[])
     AppState state = make_default_state();
 
     // 2. load config file
-    config_load(&state, nullptr);
+    const char* config_path = find_config_arg(argc, argv);
+    if (config_path)
+        state.config_path = config_path;
+    config_load(&state, config_path);
 
     // 3. parse CLI
     cli_parse(argc, argv, &state);

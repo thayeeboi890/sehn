@@ -129,6 +129,12 @@ int config_load(AppState* state, const char* path)
         state->burst_interval_ms = toml_int(cap, "burst_interval", state->burst_interval_ms);
     }
 
+    // ── [audio] ──────────────────────────────────────────────────────────────
+    toml_table_t* audio = toml_table_in(root, "audio");
+    if (audio) {
+        state->audio_device = toml_str(audio, "device", state->audio_device);
+    }
+
     // ── [ui] ─────────────────────────────────────────────────────────────────
     toml_table_t* ui = toml_table_in(root, "ui");
     if (ui) {
@@ -195,6 +201,7 @@ int config_apply_theme(AppState* state, const char* theme_name)
     // simplest approach: just parse the same keys
     toml_table_t* cam = toml_table_in(theme, "camera");
     toml_table_t* cap = toml_table_in(theme, "capture");
+    toml_table_t* audio = toml_table_in(theme, "audio");
     toml_table_t* ui = toml_table_in(theme, "ui");
 
     if (cam) {
@@ -205,6 +212,9 @@ int config_apply_theme(AppState* state, const char* theme_name)
     if (cap) {
         state->save_format = toml_str(cap, "save_format", state->save_format);
         state->jpeg_quality = toml_int(cap, "jpeg_quality", state->jpeg_quality);
+    }
+    if (audio) {
+        state->audio_device = toml_str(audio, "device", state->audio_device);
     }
     if (ui) {
         state->fullscreen = toml_bool(ui, "fullscreen", state->fullscreen);
@@ -243,6 +253,9 @@ void config_print(const AppState* state)
     printf("png_compression = %d\n", state->png_compression);
     printf("burst_count     = %d\n", state->burst_count);
     printf("burst_interval  = %d\n\n", state->burst_interval_ms);
+
+    printf("[audio]\n");
+    printf("device = \"%s\"\n\n", state->audio_device.c_str());
 
     printf("[ui]\n");
     printf("mode          = \"%s\"\n", state->mode == Mode::Photo   ? "photo"

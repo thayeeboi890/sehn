@@ -126,6 +126,14 @@ Defaults to the value in the config file, or
 .Pa /dev/video0
 if unset.
 .
+.It Cm \-a , \-\-audio\-device Ar name
+.
+Use
+.Ar name
+as the PulseAudio source for video recording audio.
+Defaults to the value in the config file, or the PulseAudio server default
+source if unset.
+.
 .It Cm \-o , \-\-output\-dir Ar directory
 .
 Save captured images and videos to
@@ -734,6 +742,9 @@ video_format = "mkv"
 burst_count = 10
 burst_interval = 100
 exif = true
+
+[audio]
+device = ""
 
 [ui]
 mode = "photo"

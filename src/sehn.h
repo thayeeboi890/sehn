@@ -89,6 +89,9 @@ struct AppState {
     int burst_interval_ms;
     std::string video_format;
 
+    // --- audio ---
+    std::string audio_device;
+
     // --- camera controls ---
     bool autofocus;
     std::string exposure_mode;
