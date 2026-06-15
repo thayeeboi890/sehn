@@ -590,8 +590,8 @@ int ui_run(AppState* state)
     // handle WM_DELETE_WINDOW so closing the window quits cleanly
     Atom wm_delete = XInternAtom(ui.dpy, "WM_DELETE_WINDOW", False);
     XSetWMProtocols(ui.dpy, ui.win, &wm_delete, 1);
-
     ui.gc = XCreateGC(ui.dpy, ui.win, 0, nullptr);
+    overlay_init(ui.dpy, ui.win, state->font_path.c_str());
     XMapWindow(ui.dpy, ui.win);
     if (state->borderless) {
         struct {
@@ -806,6 +806,7 @@ void ui_cleanup(AppState* state)
 {
     (void)state;
     shm_cleanup();
+    overlay_cleanup();
     if (ui.gc)
         XFreeGC(ui.dpy, ui.gc);
     if (ui.win)

@@ -39,3 +39,7 @@ int files_mkdir_p(const std::string& path);
 // Call once at startup after config is loaded.
 // Returns 0 on success, -1 on failure.
 int files_init_output_dir(AppState* state);
+
+// Find yudit.ttf — checks next to binary first, then system paths.
+std::string files_find_font();
+

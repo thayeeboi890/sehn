@@ -30,6 +30,42 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <cstring>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <filesystem>
+#include <string>
+
+// platform-specific includes for files_find_font
+#if defined(_WIN32)
+    #define NOMINMAX
+    #include <windows.h>
+#elif defined(__APPLE__)
+    #include <mach-o/dyld.h>
+#else
+    #include <unistd.h> // for Linux/BSD readlink
+#endif
+
+
+namespace fs = std::filesystem;
+
+fs::path get_executable_path() {
+#if defined(_WIN32)
+    wchar_t buf[MAX_PATH];
+    GetModuleFileNameW(NULL, buf, MAX_PATH);
+    return fs::path(buf);
+#elif defined(__APPLE__)
+    char buf[1024];
+    uint32_t size = sizeof(buf);
+    if (_NSGetExecutablePath(buf, &size) == 0)
+        return fs::canonical(buf);
+    return "";
+#else
+    char buf[1024] = {};
+    if (readlink("/proc/self/exe", buf, sizeof(buf) - 1) > 0) {
+        return fs::canonical(buf);
+    }
+    return "";
+#endif
+}
+
 
 std::string files_expand_path(const std::string& path)
 {
@@ -88,4 +124,21 @@ int files_init_output_dir(AppState* state)
 {
     state->output_dir = files_expand_path(state->output_dir);
     return files_mkdir_p(state->output_dir);
+}
+
+std::string files_find_font() {
+    fs::path exe_dir = get_executable_path().parent_path();
+
+    if (!exe_dir.empty()) {
+        fs::path candidate1 = exe_dir / "share" / "fonts" / "sehn" / "yudit.ttf";
+        if (fs::exists(candidate1)) return candidate1.string();
+
+        fs::path candidate2 = exe_dir / ".." / ".." / "share" / "fonts" / "yudit.ttf";
+        if (fs::exists(candidate2)) return candidate2.lexically_normal().string();
+    }
+
+    fs::path sys_path = fs::path(SEHN_DATADIR) / "fonts" / "sehn" / "yudit.ttf";
+    if (fs::exists(sys_path)) return sys_path.string();
+
+    return "";
 }

@@ -79,5 +79,6 @@ AppState make_default_state()
     s.quiet = false;
     s.running = true;
     s.notification_until = 0;
+    s.font_path = "";
     return s;
 }

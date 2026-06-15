@@ -93,7 +93,12 @@ int main(int argc, char* argv[])
         LOG_ERROR("failed to create output dir: %s", state.output_dir.c_str());
         return 1;
     }
-
+    state.font_path = files_find_font();
+    if (state.font_path.empty()) {
+        LOG_WARN("yudit.ttf not found, using default font");
+    } else {
+        LOG_DEBUG("font: %s", state.font_path.c_str());
+    }
     // 7. open camera
     LOG_INFO("attempting to open %s", state.device.c_str());
     if (camera_open(&state) < 0) {

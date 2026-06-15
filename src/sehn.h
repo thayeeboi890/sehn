@@ -117,6 +117,7 @@ struct AppState {
     bool running;
     std::string theme;
     std::string config_path;
+    std::string font_path;
 
     // --- notifications ---
     std::string notification;  /* transient user-visible message */

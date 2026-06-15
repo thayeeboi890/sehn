@@ -28,3 +28,5 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <X11/Xlib.h>
 
 void overlay_draw(AppState* state, Display* dpy, Window win, GC gc);
+void overlay_init(Display *dpy, Window win, const char *font_path);
+void overlay_cleanup();
