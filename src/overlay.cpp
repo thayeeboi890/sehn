@@ -30,6 +30,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <cstdio>
 #include <cstring>
 #include <ctime>
+#include <cmath>
+#include <cairo/cairo.h>
+#include <cairo/cairo-xlib.h>
 
 static XftFont   *g_font = nullptr;
 static XftDraw   *g_draw = nullptr;
@@ -92,6 +95,23 @@ static const char* mode_str(Mode m)
     }
 }
 
+static void draw_rec_dot(Display *dpy, Window win, int x, int y, int sz) {
+    cairo_surface_t *surf = cairo_xlib_surface_create(
+        dpy, win, DefaultVisual(dpy, DefaultScreen(dpy)),
+        DisplayWidth(dpy, DefaultScreen(dpy)),
+        DisplayHeight(dpy, DefaultScreen(dpy)));
+    cairo_t *cr = cairo_create(surf);
+    cairo_set_antialias(cr, CAIRO_ANTIALIAS_BEST);
+    uint32_t col = current_theme.rec_color;
+    cairo_set_source_rgb(cr,
+        ((col >> 16) & 0xff) / 255.0,
+        ((col >>  8) & 0xff) / 255.0,
+        ( col        & 0xff) / 255.0);    cairo_arc(cr, x + sz / 2.0, y, sz / 2.0, 0, 2 * M_PI);
+    cairo_fill(cr);
+    cairo_destroy(cr);
+    cairo_surface_destroy(surf);
+}
+
 void overlay_draw(AppState* state, Display* dpy, Window win, GC gc)
 {
     (void)dpy;
@@ -113,8 +133,9 @@ void overlay_draw(AppState* state, Display* dpy, Window win, GC gc)
 
     // top-left third line: recording indicator
     if (state->recording) {
-        snprintf(buf, sizeof(buf), "● REC");
-        xft_draw_string(current_theme.rec_color, 8, 52, buf);
+        int dot_sz = 10;
+        draw_rec_dot(dpy, win, 8, 52 - dot_sz / 2, dot_sz);
+        xft_draw_string(current_theme.rec_color, 8 + dot_sz + 4, 52, "REC");
     }
 
     // bottom-left: timestamp
