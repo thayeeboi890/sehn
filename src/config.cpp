@@ -156,8 +156,6 @@ int config_load(AppState* state, const char* path)
             state->mode = Mode::Burst;
         else if (mode == "video")
             state->mode = Mode::Video;
-        else if (mode == "preview")
-            state->mode = Mode::Preview;
     }
 
     toml_free(root);
@@ -260,8 +258,7 @@ void config_print(const AppState* state)
     printf("[ui]\n");
     printf("mode          = \"%s\"\n", state->mode == Mode::Photo   ? "photo"
                                        : state->mode == Mode::Burst ? "burst"
-                                       : state->mode == Mode::Video ? "video"
-                                                                    : "preview");
+                                                                    : "video");
     printf("fullscreen    = %s\n", state->fullscreen ? "true" : "false");
     printf("borderless    = %s\n", state->borderless ? "true" : "false");
     printf("panel         = %s\n", state->panel_visible ? "true" : "false");

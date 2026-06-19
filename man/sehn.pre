@@ -101,12 +101,6 @@ A recording indicator is shown in the overlay.
 .
 .Pp
 .
-.Em Preview mode
-opens a read-only viewfinder with no capture capability.
-Useful for framing or monitoring.
-.
-.Pp
-.
 .Em List mode
 does not open a window.
 Instead it prints all available V4L2 devices and their supported formats,
@@ -197,7 +191,7 @@ Default: 64.
 .
 Start in the specified mode.
 Accepted values:
-.Cm photo , burst , video , preview .
+.Cm photo , burst , video .
 Default:
 .Cm photo .
 .

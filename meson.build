@@ -26,8 +26,9 @@ libpulse_dep = dependency('libpulse')
 libpulse_simple_dep = dependency('libpulse-simple')
 libswr_dep  = dependency('libswresample')
 xft_dep = dependency('xft')
+cairo_dep = dependency('cairo')
 
-deps = [x11_dep, xft_dep, xext_dep, libjpeg_dep, libpng_dep, v4l2_dep, toml_dep, libav_dep, libavf_dep, libavu_dep, libavs_dep, libswr_dep,  libpulse_dep, libpulse_simple_dep]
+deps = [x11_dep, xft_dep, xext_dep, cairo_dep, libjpeg_dep, libpng_dep, v4l2_dep, toml_dep, libav_dep, libavf_dep, libavu_dep, libavs_dep, libswr_dep,  libpulse_dep, libpulse_simple_dep]
 
 if libexif_dep.found()
   deps += libexif_dep

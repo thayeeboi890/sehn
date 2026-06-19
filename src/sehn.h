@@ -39,7 +39,6 @@ enum class Mode {
     Photo,
     Burst,
     Video,
-    Preview,
 };
 
 enum class ZoomMode {

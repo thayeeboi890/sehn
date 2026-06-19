@@ -42,7 +42,7 @@ static void print_usage()
            "  -f, --format <fmt>          capture format: mjpeg, yuyv, nv12, h264\n"
            "  -r, --resolution <WxH>      capture resolution\n"
            "  -R, --framerate <fps>       frames per second\n"
-           "  -m, --mode <mode>           photo, burst, video, preview\n"
+           "  -m, --mode <mode>           photo, burst, video\n"
            "  -F, --fullscreen            start fullscreen\n"
            "  -x, --borderless            no window decorations\n"
            "  -T, --theme <name>          load named theme\n"
@@ -165,8 +165,6 @@ int cli_parse(int argc, char* argv[], AppState* state)
                 state->mode = Mode::Burst;
             else if (strcmp(optarg, "video") == 0)
                 state->mode = Mode::Video;
-            else if (strcmp(optarg, "preview") == 0)
-                state->mode = Mode::Preview;
             else {
                 LOG_ERROR("unknown mode '%s'", optarg);
                 return 1;

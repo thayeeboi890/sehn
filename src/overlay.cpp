@@ -87,8 +87,6 @@ static const char* mode_str(Mode m)
         return "BURST";
     case Mode::Video:
         return "VIDEO";
-    case Mode::Preview:
-        return "PREVIEW";
     default:
         return "???";
     }

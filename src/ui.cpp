@@ -592,6 +592,7 @@ int ui_run(AppState* state)
     XSetWMProtocols(ui.dpy, ui.win, &wm_delete, 1);
     ui.gc = XCreateGC(ui.dpy, ui.win, 0, nullptr);
     overlay_init(ui.dpy, ui.win, state->font_path.c_str());
+    panel_init(ui.dpy, ui.win, state->font_path.c_str());
     XMapWindow(ui.dpy, ui.win);
     if (state->borderless) {
         struct {
@@ -678,12 +679,15 @@ int ui_run(AppState* state)
                     state->running = false;
             }
             else if (ev.type == ButtonPress) {
+                panel_set_press(panel_hittest(state, ev.xbutton.x, ev.xbutton.y));
                 input_handle_button(state, &ev.xbutton);
             }
             else if (ev.type == ButtonRelease) {
+                panel_set_press(-1);
                 input_handle_button_release(state, &ev.xbutton);
             }
             else if (ev.type == MotionNotify) {
+                panel_set_hover(panel_hittest(state, ev.xmotion.x, ev.xmotion.y));
                 input_handle_motion(state, &ev.xmotion);
             }
             else if (ev.type == ConfigureNotify) {
@@ -807,6 +811,7 @@ void ui_cleanup(AppState* state)
     (void)state;
     shm_cleanup();
     overlay_cleanup();
+    panel_cleanup(ui.dpy);
     if (ui.gc)
         XFreeGC(ui.dpy, ui.gc);
     if (ui.win)

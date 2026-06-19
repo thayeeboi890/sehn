@@ -43,10 +43,6 @@ static void do_action(AppState* state, Action action)
         state->running = false;
         break;
     case Action::Capture: {
-        size_t fsz = 0;
-        const void* f = camera_next_frame(state, &fsz);
-        if (!f)
-            break;
         if (state->mode == Mode::Burst)
             capture_burst(state);
         else if (state->mode == Mode::Video) {
@@ -64,15 +60,19 @@ static void do_action(AppState* state, Action action)
             }
         }
         else {
+            size_t fsz = 0;
+            const void* f = camera_next_frame(state, &fsz);
+            if (!f)
+                break;
             capture_photo(state, f, fsz);
         }
         break;
     }
     case Action::NextMode:
-        state->mode = (Mode)(((int)state->mode + 1) % 4);
+        state->mode = (Mode)(((int)state->mode + 1) % 3);
         break;
     case Action::PrevMode:
-        state->mode = (Mode)(((int)state->mode + 3) % 4);
+        state->mode = (Mode)(((int)state->mode + 2) % 3);
         break;
     case Action::TogglePanel:
         state->panel_visible = !state->panel_visible;
@@ -256,8 +256,8 @@ void input_handle_button(AppState* state, XButtonEvent* ev)
             do_action(state, Action::NextMode);
             ui_present_current_frame(state);
             return;
-        case PANEL_MENU:
-            /* TODO: open menu */
+        case PANEL_PHOTOS:
+            system("xdg-open ~/Pictures/sehn &"); //TODO: replace with proper file reference
             return;
         default:
             return;

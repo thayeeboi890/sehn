@@ -80,7 +80,7 @@ void signals_dispatch(AppState* state)
 
     if (state->sig_next_mode) {
         state->sig_next_mode = false;
-        state->mode = (Mode)(((int)state->mode + 1) % 4);
+        state->mode = (Mode)(((int)state->mode + 1) % 3);
         printf("sehn: mode -> %d\n", (int)state->mode);
     }
 

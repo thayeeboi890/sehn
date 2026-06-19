@@ -102,6 +102,8 @@ static Action action_from_str(const char* s)
         return Action::TogglePanel;
     if (strcmp(s, "toggle_overlay") == 0)
         return Action::ToggleOverlay;
+    if (strcmp(s, "toggle_info") == 0)
+        return Action::ToggleOverlay;
     if (strcmp(s, "toggle_fullscreen") == 0)
         return Action::ToggleFullscreen;
     if (strcmp(s, "zoom_in") == 0)

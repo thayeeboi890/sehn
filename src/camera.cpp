@@ -32,13 +32,16 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <cstring>
 #include <fcntl.h>
 #include <linux/videodev2.h>
+#include <pthread.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <poll.h>
+#include <vector>
 
 // one CameraState per app, lives here
 static CameraState cam = {};
+static pthread_mutex_t cam_frame_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // detected PTZ control info (populated at open)
 struct ControlInfo {
@@ -327,35 +330,46 @@ const void* camera_next_frame(AppState* state, size_t* out_size)
 {
     LOG_FN();
     (void)state;
+    static thread_local std::vector<uint8_t> frame_copy;
 
     // wait for a frame with 2s timeout
     // poll with short timeout so signals don't kill us
+    pthread_mutex_lock(&cam_frame_mutex);
     struct pollfd pfd = { cam.fd, POLLIN, 0 };
     int r;
     do {
         r = poll(&pfd, 1, 500);  // 500ms timeout
     } while (r < 0 && errno == EINTR);
 
-    if (r < 0 || r == 0) return nullptr;
+    if (r < 0 || r == 0) {
+        pthread_mutex_unlock(&cam_frame_mutex);
+        return nullptr;
+    }
 
     struct v4l2_buffer buf = {};
     buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     buf.memory = V4L2_MEMORY_MMAP;
 
     if (xioctl(cam.fd, VIDIOC_DQBUF, &buf) < 0) {
-        if (errno == EAGAIN)
+        if (errno == EAGAIN) {
+            pthread_mutex_unlock(&cam_frame_mutex);
             return nullptr;
+        }
         perror("VIDIOC_DQBUF");
+        pthread_mutex_unlock(&cam_frame_mutex);
         return nullptr;
     }
     *out_size = buf.bytesused;
-    const void* data = cam.buffers[buf.index].start;
+    frame_copy.resize(buf.bytesused);
+    if (buf.bytesused > 0)
+        memcpy(frame_copy.data(), cam.buffers[buf.index].start, buf.bytesused);
 
     // re-enqueue immediately
     if (xioctl(cam.fd, VIDIOC_QBUF, &buf) < 0)
         perror("VIDIOC_QBUF");
 
-    return data;
+    pthread_mutex_unlock(&cam_frame_mutex);
+    return frame_copy.empty() ? nullptr : frame_copy.data();
 }
 
 void camera_stop(AppState* state)
