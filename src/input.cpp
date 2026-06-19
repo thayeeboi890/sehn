@@ -26,6 +26,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "input.h"
 #include "camera.h"
 #include "capture.h"
+#include "files.h"
 #include "panel.h"
 #include "ui.h"
 #include "utils.h"
@@ -33,8 +34,36 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <X11/Xutil.h>
 #include <cmath>
 #include <cstdio>
+#include <string>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+
+static void open_output_dir(const AppState* state)
+{
+    std::string dir = state->output_dir.empty() ? "." : files_expand_path(state->output_dir);
+
+    pid_t child = fork();
+    if (child < 0) {
+        perror("fork");
+        return;
+    }
+
+    if (child == 0) {
+        pid_t grandchild = fork();
+        if (grandchild < 0)
+            _exit(127);
+
+        if (grandchild == 0) {
+            execlp("xdg-open", "xdg-open", dir.c_str(), (char*)nullptr);
+            _exit(127);
+        }
+
+        _exit(0);
+    }
+
+    waitpid(child, nullptr, 0);
+}
 
 static void do_action(AppState* state, Action action)
 {
@@ -257,7 +286,7 @@ void input_handle_button(AppState* state, XButtonEvent* ev)
             ui_present_current_frame(state);
             return;
         case PANEL_PHOTOS:
-            system("xdg-open ~/Pictures/sehn &"); //TODO: replace with proper file reference
+            open_output_dir(state);
             return;
         default:
             return;
