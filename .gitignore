@@ -60,6 +60,9 @@ Thumbs.db
 # Logs
 *.log
 
+# Subprojects
+subprojects/tomlc99
+
 # Misc
 tags
 ctags
