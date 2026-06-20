@@ -31,6 +31,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "panel.h"
 #include "signals.h"
 #include "video.h"
+#include "menu.h"
 
 #include <cerrno>
 #include <cstdio>
@@ -543,6 +544,10 @@ void ui_present_current_frame(AppState* state)
     pthread_mutex_unlock(&ui.last_rgb_mutex);
 }
 
+void ui_show_menu(AppState *state, int x, int y) {
+    menu_show(state, ui.dpy, ui.win, ui.gc, x, y);
+}
+
 // ── main loop ────────────────────────────────────────────────────────────────
 
 int ui_run(AppState* state)
@@ -593,6 +598,7 @@ int ui_run(AppState* state)
     ui.gc = XCreateGC(ui.dpy, ui.win, 0, nullptr);
     overlay_init(ui.dpy, ui.win, state->font_path.c_str());
     panel_init(ui.dpy, ui.win, state->font_path.c_str());
+    menu_init(ui.dpy, ui.win, state->font_path.c_str());
     XMapWindow(ui.dpy, ui.win);
     if (state->borderless) {
         struct {
@@ -812,6 +818,7 @@ void ui_cleanup(AppState* state)
     shm_cleanup();
     overlay_cleanup();
     panel_cleanup(ui.dpy);
+    menu_cleanup(ui.dpy);
     if (ui.gc)
         XFreeGC(ui.dpy, ui.gc);
     if (ui.win)

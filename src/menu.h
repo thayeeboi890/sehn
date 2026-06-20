@@ -1,4 +1,4 @@
-/* ui.h
+/* menu.h
 
 Copyright (C) 2026 Santiago Silva.
 
@@ -10,9 +10,9 @@ sell copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
 
 The above copyright notice and this permission notice shall be included in
-all copies of the Software and its documentation and acknowledgment shall be
-given in the documentation and software packages that this Software was
-used.
+all copies or substantial portions of the Software and its documentation and
+acknowledgment shall be given in the documentation and software packages that
+this Software was used.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -22,25 +22,18 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 */
-
 #pragma once
 
 #include "sehn.h"
+#include <X11/Xlib.h>
 
-// Create the X11 window, start the frame loop, handle input.
-int ui_run(AppState* state);
+// Call once after the window is mapped.
+void menu_init(Display *dpy, Window win, const char *font_path);
+void menu_cleanup(Display *dpy);
 
-// Tear down the X11 window and free resources.
-void ui_cleanup(AppState* state);
+// Show the right-click context menu at (x, y) in window coordinates.
+// Runs its own nested event loop until the user dismisses it.
+void menu_show(AppState *state, Display *dpy, Window win, GC gc, int x, int y);
 
-// Present the last-converted RGB frame using the provided source rectangle.
-// This is used by input handlers to render software-only pan/zoom while dragging
-// without committing hardware PTZ until release.
-void ui_present_last_rgb_region(AppState* state, int src_x, int src_y, uint32_t src_w,
-                                uint32_t src_h);
-
-// Present the last-converted RGB frame using the current zoom, pan, flip, and rotation state.
-void ui_present_current_frame(AppState* state);
-
-// Toggle the right click menu to display over mouse cursor.
-void ui_show_menu(AppState *state, int x, int y);
+// Returns true if the menu is currently visible.
+bool menu_is_open();

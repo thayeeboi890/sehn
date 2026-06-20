@@ -297,10 +297,9 @@ void input_handle_button(AppState* state, XButtonEvent* ev)
     // Only handle non-PTZ buttons here: right-click (toggle panel), middle-click (zoom fit), wheel
     // and ctrl+wheel.
     if (btn == 3) {
-        // toggle menu/panel
-        state->panel_visible = !state->panel_visible;
-        ui_present_current_frame(state);
-        return;
+        extern void menu_show(AppState *, Display *, Window, GC, int, int);
+        ui_show_menu(state, ev->x, ev->y);
+	return;
     }
 
     if (btn == 2) {

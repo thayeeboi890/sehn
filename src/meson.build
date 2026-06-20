@@ -19,6 +19,7 @@ sources = files(
   'audio.cpp',
   'utils.cpp',
   'theme.cpp',
+  'menu.cpp',
 )
 
 executable('sehn',
