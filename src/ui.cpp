@@ -831,11 +831,49 @@ void ui_cleanup(AppState* state)
 void ui_flash(AppState *state) {
     if (!ui.dpy || !ui.win) return;
     int total_w = state->win_w + (state->panel_visible ? state->panel_width : 0);
-    // white flash
+    int total_h = state->win_h;
+
     XSetForeground(ui.dpy, ui.gc, 0xffffff);
-    XFillRectangle(ui.dpy, ui.win, ui.gc, 0, 0, total_w, state->win_h);
+    XFillRectangle(ui.dpy, ui.win, ui.gc, 0, 0, total_w, total_h);
     XFlush(ui.dpy);
-    usleep(60000); // 60ms white
-    // restore by redrawing current frame
+    usleep(40000);
+
+    ui_present_current_frame(state);
+    XImage *base = XGetImage(ui.dpy, ui.win, 0, 0, total_w, total_h, AllPlanes, ZPixmap);
+    if (!base) return;
+
+    XImage *flash = XGetImage(ui.dpy, ui.win, 0, 0, total_w, total_h, AllPlanes, ZPixmap);
+    if (!flash) {
+        XDestroyImage(base);
+        return;
+    }
+
+    int steps = 12;
+    for (int s = 1; s <= steps; s++) {
+        float alpha = 1.0f - ((float)s / (float)steps);
+
+        for (int y = 0; y < total_h; y++) {
+            for (int x = 0; x < total_w; x++) {
+                unsigned long orig = XGetPixel(base, x, y);
+                
+                unsigned char r = (orig >> 16) & 0xff;
+                unsigned char g = (orig >> 8) & 0xff;
+                unsigned char b = orig & 0xff;
+
+                r = (unsigned char)(r * (1.0f - alpha) + 255.0f * alpha);
+                g = (unsigned char)(g * (1.0f - alpha) + 255.0f * alpha);
+                b = (unsigned char)(b * (1.0f - alpha) + 255.0f * alpha);
+
+                XPutPixel(flash, x, y, (r << 16) | (g << 8) | b);
+            }
+        }
+
+        XPutImage(ui.dpy, ui.win, ui.gc, flash, 0, 0, 0, 0, total_w, total_h);
+        XFlush(ui.dpy);
+        usleep(20000);
+    }
+
+    XDestroyImage(base);
+    XDestroyImage(flash);
     ui_present_current_frame(state);
 }
