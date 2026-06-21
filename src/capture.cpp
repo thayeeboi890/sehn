@@ -29,6 +29,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "utils.h"
 #include "video.h"
 #include "audio.h"
+#include "ui.h"
 
 #include <cerrno>
 #include <cstdio>
@@ -245,6 +246,7 @@ int capture_photo(AppState* state, const void* frame, size_t frame_size)
         ret = save_jpeg(state, rgb, state->width, state->height);
 
     free(rgb);
+    ui_flash(state);
     return ret;
 }
 
@@ -261,7 +263,17 @@ void capture_burst(AppState* state)
             LOG_WARN("burst frame %d failed", i);
             continue;
         }
-        capture_photo(state, frame, frame_size);
+        uint8_t* rgb;
+        if (state->v4l2_format == "mjpeg")
+            rgb = mjpeg_decode(frame, frame_size, state->width, state->height);
+        else
+            rgb = yuyv_decode(frame, state->width, state->height);
+        if (state->save_format == "png")
+            save_png(state, rgb, state->width, state->height);
+        else
+            save_jpeg(state, rgb, state->width, state->height);
+        free(rgb);
+        ui_flash(state);
         usleep((useconds_t)state->burst_interval_ms * 1000);
     }
 
@@ -293,4 +305,5 @@ void capture_video_frame(AppState* state, const void* frame, size_t frame_size)
 void capture_video_stop(AppState *state) {
     audio_close(state);
     video_close(state);
+    ui_flash(state);
 }

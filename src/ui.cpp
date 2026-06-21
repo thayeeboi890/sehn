@@ -827,3 +827,15 @@ void ui_cleanup(AppState* state)
         XCloseDisplay(ui.dpy);
     ui = {};
 }
+
+void ui_flash(AppState *state) {
+    if (!ui.dpy || !ui.win) return;
+    int total_w = state->win_w + (state->panel_visible ? state->panel_width : 0);
+    // white flash
+    XSetForeground(ui.dpy, ui.gc, 0xffffff);
+    XFillRectangle(ui.dpy, ui.win, ui.gc, 0, 0, total_w, state->win_h);
+    XFlush(ui.dpy);
+    usleep(60000); // 60ms white
+    // restore by redrawing current frame
+    ui_present_current_frame(state);
+}

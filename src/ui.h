@@ -44,3 +44,6 @@ void ui_present_current_frame(AppState* state);
 
 // Toggle the right click menu to display over mouse cursor.
 void ui_show_menu(AppState *state, int x, int y);
+
+// Flash the window to indicate capture.
+void ui_flash(AppState *state);
