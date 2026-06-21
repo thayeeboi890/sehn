@@ -763,236 +763,222 @@ static void draw_popup(PopupCtx &ctx) {
     XFlush(dpy);
 }
 
-// ── recursive popup runner ────────────────────────────────────────────────────
-// Opens popup for `items` at (screen_x, screen_y).
-// Submenus open on hover, replacing any previously-open child.
-// Returns pointer to the leaf MenuItem that was clicked, or nullptr on dismiss.
+// ── popup runner ─────────────────────────────────────────────────────────────
+// One event loop owns the full stack of visible menus. This avoids recursive
+// grabs, so a submenu closing on dehover never blocks the parent menu.
 
-static const MenuItem *run_popup(AppState *state, Display *dpy, Window parent_win,
-                                  const std::vector<MenuItem> &items,
-                                  int screen_x, int screen_y);
-
-// State for the active child popup spawned by hover
-struct ChildState {
-    Window               child_win  = None; // sentinel: None = no child open
-    int                  parent_idx = -1;   // which parent item owns the child
-    const MenuItem      *result     = nullptr;
-    bool                 done       = false;
+struct MenuLevel {
+    PopupCtx ctx;
+    int      parent_level = -1;
+    int      parent_idx   = -1;
 };
 
-static const MenuItem *run_popup(AppState *state, Display *dpy, Window /*parent_win*/,
+static PopupCtx create_popup_ctx(Display *dpy, int screen,
                                   const std::vector<MenuItem> &items,
-                                  int screen_x, int screen_y) {
-    int screen = DefaultScreen(dpy);
-    int w = items_width(dpy, items);
-    int h = items_height(items);
-
-    // clamp to screen
-    int sw = DisplayWidth(dpy, screen);
-    int sh = DisplayHeight(dpy, screen);
-    if (screen_x + w > sw) screen_x = sw - w - 4;
-    if (screen_y + h > sh) screen_y = sh - h - 4;
-    if (screen_x < 0) screen_x = 0;
-    if (screen_y < 0) screen_y = 0;
-
+                                  int x, int y) {
     PopupCtx ctx;
     ctx.dpy      = dpy;
     ctx.items    = items;
-    ctx.w        = w;
-    ctx.h        = h;
+    ctx.w        = items_width(dpy, items);
+    ctx.h        = items_height(items);
     ctx.hover    = -1;
     ctx.open_sub = -1;
-    ctx.origin_x = screen_x;
-    ctx.origin_y = screen_y;
-    ctx.win  = create_popup(dpy, screen, screen_x, screen_y, w, h);
+
+    int sw = DisplayWidth(dpy, screen);
+    int sh = DisplayHeight(dpy, screen);
+    if (x + ctx.w > sw) x = sw - ctx.w - 4;
+    if (y + ctx.h > sh) y = sh - ctx.h - 4;
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+
+    ctx.origin_x = x;
+    ctx.origin_y = y;
+    ctx.win  = create_popup(dpy, screen, x, y, ctx.w, ctx.h);
     ctx.gc   = XCreateGC(dpy, ctx.win, 0, nullptr);
     ctx.draw = XftDrawCreate(dpy, ctx.win,
                              DefaultVisual(dpy, screen),
                              DefaultColormap(dpy, screen));
-
-    // We do NOT grab at this level when called recursively; the top-level
-    // caller holds the grab. Grab only for the root invocation.
-    bool is_root = false;
-    {
-        // Detect root by checking if any grab is already active.
-        // Simpler: we always grab here and ungrab before recursing.
-        XGrabPointer(dpy, ctx.win, True,
-                     ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
-                     GrabModeAsync, GrabModeAsync,
-                     None, None, CurrentTime);
-        XGrabKeyboard(dpy, ctx.win, True,
-                      GrabModeAsync, GrabModeAsync, CurrentTime);
-        is_root = true;
-    }
-
     draw_popup(ctx);
+    return ctx;
+}
 
-    const MenuItem *result  = nullptr;
-    bool            done    = false;
+static void destroy_popup_ctx(PopupCtx &ctx) {
+    if (ctx.draw) {
+        XftDrawDestroy(ctx.draw);
+        ctx.draw = nullptr;
+    }
+    if (ctx.gc) {
+        XFreeGC(ctx.dpy, ctx.gc);
+        ctx.gc = 0;
+    }
+    if (ctx.win != None) {
+        XDestroyWindow(ctx.dpy, ctx.win);
+        ctx.win = None;
+    }
+}
 
-    // Tracks the open child popup window so we can destroy it on hover change.
-    Window  child_win   = None;
-    int     child_idx   = -1;  // which item in ctx.items opened the child
-    const MenuItem *child_result = nullptr;
-    bool    child_done  = false;
+static int level_for_window(const std::vector<MenuLevel> &levels, Window win) {
+    for (int i = 0; i < (int)levels.size(); i++) {
+        if (levels[i].ctx.win == win) return i;
+    }
+    return -1;
+}
 
-    auto close_child = [&]() {
-        if (child_win != None) {
-            XDestroyWindow(dpy, child_win);
-            XFlush(dpy);
-            child_win  = None;
-            child_idx  = -1;
-            ctx.open_sub = -1;
-            draw_popup(ctx);
-        }
-    };
+static bool pointer_in_ctx(Display *dpy, const PopupCtx &ctx,
+                            int *out_x = nullptr, int *out_y = nullptr) {
+    Window root_ret, child_ret;
+    int root_x, root_y, win_x, win_y;
+    unsigned int mask;
+    if (!XQueryPointer(dpy, ctx.win, &root_ret, &child_ret,
+                       &root_x, &root_y, &win_x, &win_y, &mask))
+        return false;
+    if (out_x) *out_x = win_x;
+    if (out_y) *out_y = win_y;
+    return win_x >= 0 && win_x < ctx.w && win_y >= 0 && win_y < ctx.h;
+}
+
+static bool pointer_on_parent_row(Display *dpy,
+                                   const std::vector<MenuLevel> &levels,
+                                   int level_idx) {
+    const MenuLevel &lvl = levels[level_idx];
+    if (lvl.parent_level < 0 || lvl.parent_level >= (int)levels.size())
+        return false;
+
+    const PopupCtx &parent = levels[lvl.parent_level].ctx;
+    int px, py;
+    if (!pointer_in_ctx(dpy, parent, &px, &py))
+        return false;
+    return hittest_items(parent.items, py) == lvl.parent_idx;
+}
+
+static void close_levels_from(Display *dpy, std::vector<MenuLevel> &levels,
+                               int first) {
+    if (first < 0) first = 0;
+    if (first >= (int)levels.size()) return;
+
+    for (int i = (int)levels.size() - 1; i >= first; i--)
+        destroy_popup_ctx(levels[i].ctx);
+    levels.resize(first);
+
+    if (!levels.empty() && first > 0) {
+        levels[first - 1].ctx.open_sub = -1;
+        draw_popup(levels[first - 1].ctx);
+    }
+    XFlush(dpy);
+}
+
+static void open_submenu(Display *dpy, int screen, std::vector<MenuLevel> &levels,
+                          int level_idx, int item_idx) {
+    PopupCtx &parent = levels[level_idx].ctx;
+    if (parent.open_sub == item_idx && level_idx + 1 < (int)levels.size())
+        return;
+
+    close_levels_from(dpy, levels, level_idx + 1);
+
+    const MenuItem &it = parent.items[item_idx];
+    int child_w = items_width(dpy, it.children);
+    int sw = DisplayWidth(dpy, screen);
+    int x = parent.origin_x + parent.w;
+    if (x + child_w > sw) x = parent.origin_x - child_w;
+    int y = parent.origin_y + item_y(parent.items, item_idx);
+
+    parent.open_sub = item_idx;
+    draw_popup(parent);
+
+    MenuLevel child;
+    child.ctx = create_popup_ctx(dpy, screen, it.children, x, y);
+    child.parent_level = level_idx;
+    child.parent_idx = item_idx;
+    levels.push_back(child);
+}
+
+static bool run_popup(Display *dpy, const std::vector<MenuItem> &items,
+                       int screen_x, int screen_y, MenuItem *chosen) {
+    int screen = DefaultScreen(dpy);
+    Window root = RootWindow(dpy, screen);
+    std::vector<MenuLevel> levels;
+    levels.reserve(8);
+
+    MenuLevel root_level;
+    root_level.ctx = create_popup_ctx(dpy, screen, items, screen_x, screen_y);
+    levels.push_back(root_level);
+
+    XGrabPointer(dpy, root, True,
+                 ButtonPressMask | ButtonReleaseMask | PointerMotionMask,
+                 GrabModeAsync, GrabModeAsync,
+                 None, None, CurrentTime);
+    XGrabKeyboard(dpy, root, True,
+                  GrabModeAsync, GrabModeAsync, CurrentTime);
+
+    bool selected = false;
+    bool done = false;
 
     while (!done) {
-        // Non-blocking check for child events when a child exists.
-        // We use XPending + XNextEvent so we can share the single event queue.
-        if (!XPending(dpy) && child_win == None) {
-            // block only if no child is active
-            XEvent ev;
-            XNextEvent(dpy, &ev);
-            // re-queue for unified handling below
-            XPutBackEvent(dpy, &ev);
-        }
-
-        if (!XPending(dpy)) {
-            usleep(5000);
-            continue;
-        }
-
         XEvent ev;
         XNextEvent(dpy, &ev);
-
         Window ev_win = ev.xany.window;
+        int level_idx = level_for_window(levels, ev_win);
 
-        // ── events on child window ───────────────────────────────────────────
-        if (child_win != None && ev_win == child_win) {
-            if (ev.type == Expose) {
-                // child redraws itself; nothing to do here
-            }
-            else if (ev.type == ButtonRelease) {
-                // A click in the child: find the item
-                // We can't call into a live child ctx here because it's
-                // managed by a previous run_popup frame on the call stack.
-                // Instead, run_popup for the child is called synchronously
-                // below — see the hover-open logic.
-                // For the hover-driven approach we use below, this branch
-                // shouldn't fire because we re-run the child synchronously.
-            }
-            continue;
+        if (ev.type == Expose && level_idx >= 0) {
+            draw_popup(levels[level_idx].ctx);
         }
-
-        // ── events on our window ─────────────────────────────────────────────
-        if (ev.type == Expose && ev_win == ctx.win) {
-            draw_popup(ctx);
-        }
-        else if (ev.type == MotionNotify) {
-            // Determine which window the pointer is in
-            if (ev_win == ctx.win) {
-                int hit = hittest_items(ctx.items, ev.xmotion.y);
-
-                if (hit != ctx.hover) {
-                    ctx.hover = hit;
-
-                    if (hit >= 0 && ctx.items[hit].type == ItemType::Submenu) {
-                        // Open child submenu for this item (close old one first)
-                        if (child_idx != hit) {
-                            close_child();
-
-                            ctx.open_sub = hit;
-                            draw_popup(ctx);
-
-                            int iy = ctx.origin_y + item_y(ctx.items, hit);
-                            int ix = ctx.origin_x + ctx.w;
-
-                            // clamp child x to screen
-                            int cw_est = MENU_MIN_W + 40;
-                            if (ix + cw_est > sw) ix = ctx.origin_x - cw_est;
-
-                            // Run child synchronously — this blocks until the
-                            // child is dismissed or a leaf is clicked.
-                            XUngrabPointer(dpy, CurrentTime);
-                            XUngrabKeyboard(dpy, CurrentTime);
-
-                            result = run_popup(state, dpy, ctx.win,
-                                               ctx.items[hit].children,
-                                               ix, iy);
-                            done = true; // propagate up regardless of result
-                            break;
-                        }
-                    } else {
-                        // Hovering a non-submenu item: close any open child
-                        if (child_idx != -1) {
-                            close_child();
-                        }
-                        draw_popup(ctx);
-                    }
+        else if (ev.type == MotionNotify && level_idx >= 0) {
+            PopupCtx &ctx = levels[level_idx].ctx;
+            int hit = hittest_items(ctx.items, ev.xmotion.y);
+            if (hit != ctx.hover) {
+                ctx.hover = hit;
+                if (hit >= 0 && ctx.items[hit].type == ItemType::Submenu) {
+                    open_submenu(dpy, screen, levels, level_idx, hit);
+                } else {
+                    close_levels_from(dpy, levels, level_idx + 1);
+                    draw_popup(levels[level_idx].ctx);
                 }
             }
-            // If pointer moves into child, let child handle it via its own
-            // MotionNotify events (pointer grab is on child's window).
         }
-        else if (ev.type == LeaveNotify && ev_win == ctx.win) {
-            // Only clear hover if leaving to something that isn't our child
-            if (child_win == None) {
-                ctx.hover = -1;
-                draw_popup(ctx);
+        else if (ev.type == LeaveNotify && level_idx > 0) {
+            bool in_self = pointer_in_ctx(dpy, levels[level_idx].ctx);
+            bool in_child = false;
+            if (level_idx + 1 < (int)levels.size())
+                in_child = pointer_in_ctx(dpy, levels[level_idx + 1].ctx);
+
+            if (!in_self && !in_child &&
+                !pointer_on_parent_row(dpy, levels, level_idx)) {
+                close_levels_from(dpy, levels, level_idx);
             }
+        }
+        else if (ev.type == LeaveNotify && level_idx == 0) {
+            if (levels.size() == 1) {
+                levels[0].ctx.hover = -1;
+                draw_popup(levels[0].ctx);
+            }
+        }
+        else if (ev.type == ButtonRelease && level_idx >= 0) {
+            PopupCtx &ctx = levels[level_idx].ctx;
+            int hit = hittest_items(ctx.items, ev.xbutton.y);
+            if (hit >= 0) {
+                const MenuItem &it = ctx.items[hit];
+                if (it.type == ItemType::Submenu) {
+                    open_submenu(dpy, screen, levels, level_idx, hit);
+                } else {
+                    if (chosen) *chosen = it;
+                    selected = true;
+                    done = true;
+                }
+            }
+        }
+        else if (ev.type == ButtonPress && level_idx < 0) {
+            done = true;
         }
         else if (ev.type == KeyPress) {
             KeySym sym = XLookupKeysym(&ev.xkey, 0);
             if (sym == XK_Escape) done = true;
         }
-        else if (ev.type == ButtonPress) {
-            // Click outside any of our windows = dismiss
-            if (ev_win != ctx.win && (child_win == None || ev_win != child_win)) {
-                done = true;
-            }
-        }
-        else if (ev.type == ButtonRelease && ev_win == ctx.win) {
-            int hit = hittest_items(ctx.items, ev.xbutton.y);
-            if (hit >= 0) {
-                const MenuItem &it = ctx.items[hit];
-                if (it.type == ItemType::Submenu) {
-                    // Click on submenu item: open child synchronously
-                    close_child();
-                    ctx.open_sub = hit;
-                    draw_popup(ctx);
-
-                    int iy = ctx.origin_y + item_y(ctx.items, hit);
-                    int ix = ctx.origin_x + ctx.w;
-                    int cw_est = MENU_MIN_W + 40;
-                    if (ix + cw_est > sw) ix = ctx.origin_x - cw_est;
-
-                    XUngrabPointer(dpy, CurrentTime);
-                    XUngrabKeyboard(dpy, CurrentTime);
-
-                    result = run_popup(state, dpy, ctx.win,
-                                       it.children, ix, iy);
-                    done = true;
-                } else {
-                    result = &ctx.items[hit];
-                    done = true;
-                }
-            }
-        }
     }
 
-    close_child();
-
-    if (is_root) {
-        XUngrabPointer(dpy, CurrentTime);
-        XUngrabKeyboard(dpy, CurrentTime);
-    }
-    XftDrawDestroy(ctx.draw);
-    XFreeGC(dpy, ctx.gc);
-    XDestroyWindow(dpy, ctx.win);
-    XFlush(dpy);
-
-    return result;
+    XUngrabPointer(dpy, CurrentTime);
+    XUngrabKeyboard(dpy, CurrentTime);
+    close_levels_from(dpy, levels, 0);
+    return selected;
 }
 
 // ── public entry point ────────────────────────────────────────────────────────
@@ -1010,9 +996,10 @@ void menu_show(AppState *state, Display *dpy, Window win, GC /*gc*/, int x, int 
     XTranslateCoordinates(dpy, win, RootWindow(dpy, DefaultScreen(dpy)),
                           x, y, &sx, &sy, &child);
 
-    const MenuItem *chosen = run_popup(state, dpy, win, items, sx, sy);
-    if (chosen && chosen->action != ActionID::Noop && !chosen->disabled)
-        dispatch(state, *chosen);
+    MenuItem chosen;
+    if (run_popup(dpy, items, sx, sy, &chosen) &&
+        chosen.action != ActionID::Noop && !chosen.disabled)
+        dispatch(state, chosen);
 
     g_open = false;
 }
