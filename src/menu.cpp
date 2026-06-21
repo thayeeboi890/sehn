@@ -103,9 +103,6 @@ enum class ActionID {
     CameraDevice,
     FormatMJPEG,
     FormatYUYV,
-    Res1280x720,
-    Res1920x1080,
-    Res640x480,
     FPS30,
     FPS60,
     FPS15,
@@ -125,16 +122,10 @@ enum class ActionID {
     Rotate270,
     RotateReset,
     // View
-    ToggleOverlay,
-    TogglePanel,
     ToggleFullscreen,
     ZoomFit,
     ZoomFill,
     Zoom100,
-    // Help
-    About,
-    Keybindings,
-    ReloadConfig,
 };
 
 struct MenuItem {
@@ -162,12 +153,12 @@ static std::vector<VideoDevice> enum_video_devices() {
         snprintf(path, sizeof(path), "/dev/video%d", i);
         int fd = open(path, O_RDWR | O_NONBLOCK);
         if (fd < 0) continue;
-        struct v4l2_capability cap = {};
-        if (ioctl(fd, VIDIOC_QUERYCAP, &cap) == 0 &&
-            (cap.capabilities & V4L2_CAP_VIDEO_CAPTURE)) {
+        struct v4l2_capability pcap = {};
+        if (ioctl(fd, VIDIOC_QUERYCAP, &pcap) == 0 &&
+            (pcap.capabilities & V4L2_CAP_VIDEO_CAPTURE)) {
             VideoDevice d;
             d.path = path;
-            d.name = (const char *)cap.card;
+            d.name = (const char *)pcap.card;
             devs.push_back(d);
         }
         close(fd);
@@ -247,8 +238,6 @@ static MenuItem make_submenu(const char *label, std::vector<MenuItem> children) 
     return m;
 }
 
-// Build top-level menu: 6 collapsed section items, each a Submenu.
-// All content lives in children — nothing is shown flat at top level.
 static std::vector<MenuItem> build_menu(AppState *state) {
     auto vdevs = enum_video_devices();
     auto asrcs = enum_pa_sources();
@@ -288,14 +277,6 @@ static std::vector<MenuItem> build_menu(AppState *state) {
         fmt.push_back(make_action(ActionID::FormatYUYV,  "YUYV",
                                   state->v4l2_format == "yuyv"));
         cam_items.push_back(make_submenu("Pixel format", std::move(fmt)));
-    }
-    {
-        std::vector<MenuItem> res;
-        auto cur = std::to_string(state->width) + "x" + std::to_string(state->height);
-        res.push_back(make_action(ActionID::Res640x480,   "640×480",   cur == "640x480"));
-        res.push_back(make_action(ActionID::Res1280x720,  "1280×720",  cur == "1280x720"));
-        res.push_back(make_action(ActionID::Res1920x1080, "1920×1080", cur == "1920x1080"));
-        cam_items.push_back(make_submenu("Resolution", std::move(res)));
     }
     {
         std::vector<MenuItem> fps;
@@ -362,10 +343,6 @@ static std::vector<MenuItem> build_menu(AppState *state) {
 
     // ── View ──────────────────────────────────────────────────────────────────
     std::vector<MenuItem> view_items;
-    view_items.push_back(make_action(ActionID::ToggleOverlay,    "Info overlay",
-                                     state->overlay_visible));
-    view_items.push_back(make_action(ActionID::TogglePanel,      "Side panel",
-                                     state->panel_visible));
     view_items.push_back(make_action(ActionID::ToggleFullscreen, "Fullscreen",
                                      state->fullscreen));
     view_items.push_back(make_sep());
@@ -381,20 +358,13 @@ static std::vector<MenuItem> build_menu(AppState *state) {
         view_items.push_back(make_submenu("Zoom", std::move(zm)));
     }
 
-    // ── Help ──────────────────────────────────────────────────────────────────
-    std::vector<MenuItem> help_items;
-    help_items.push_back(make_action(ActionID::ReloadConfig, "Reload config"));
-    help_items.push_back(make_action(ActionID::Keybindings,  "Keybindings…"));
-    help_items.push_back(make_action(ActionID::About,        "About sehn…"));
-
-    // ── Top-level: one Submenu per section ───────────────────────────────────
+    // ── Top-level ────────────────────────────────────────────────────────────
     std::vector<MenuItem> top;
     top.push_back(make_submenu("File",     std::move(file_items)));
     top.push_back(make_submenu("Camera",   std::move(cam_items)));
     top.push_back(make_submenu("Audio",    std::move(audio_items)));
     top.push_back(make_submenu("Controls", std::move(ctrl_items)));
     top.push_back(make_submenu("View",     std::move(view_items)));
-    top.push_back(make_submenu("Help",     std::move(help_items)));
     return top;
 }
 
@@ -428,22 +398,6 @@ static void dispatch(AppState *state, const MenuItem &item) {
         case ActionID::FormatYUYV:
             state->v4l2_format = "yuyv";
             state->notification = "Format change takes effect on restart";
-            state->notification_until = time(nullptr) + 3;
-            break;
-
-        case ActionID::Res640x480:
-            state->width = 640; state->height = 480;
-            state->notification = "Resolution change takes effect on restart";
-            state->notification_until = time(nullptr) + 3;
-            break;
-        case ActionID::Res1280x720:
-            state->width = 1280; state->height = 720;
-            state->notification = "Resolution change takes effect on restart";
-            state->notification_until = time(nullptr) + 3;
-            break;
-        case ActionID::Res1920x1080:
-            state->width = 1920; state->height = 1080;
-            state->notification = "Resolution change takes effect on restart";
             state->notification_until = time(nullptr) + 3;
             break;
 
@@ -496,12 +450,6 @@ static void dispatch(AppState *state, const MenuItem &item) {
         case ActionID::Rotate270:    state->rotate_deg = 270; break;
         case ActionID::RotateReset:  state->rotate_deg = 0;   break;
 
-        case ActionID::ToggleOverlay:
-            state->overlay_visible = !state->overlay_visible;
-            break;
-        case ActionID::TogglePanel:
-            state->panel_visible = !state->panel_visible;
-            break;
         case ActionID::ToggleFullscreen:
             state->fullscreen = !state->fullscreen;
             break;
@@ -515,25 +463,6 @@ static void dispatch(AppState *state, const MenuItem &item) {
             state->zoom_mode = ZoomMode::Percent;
             state->zoom = 1.0f;
             break;
-
-        case ActionID::ReloadConfig:
-            state->sig_reload_config = 1;
-            break;
-        case ActionID::Keybindings:
-            system("xdg-open https://github.com/thayeebo1890/sehn#keybindings &");
-            break;
-        case ActionID::About: {
-            char msg[512];
-            snprintf(msg, sizeof(msg),
-                     "sehn " SEHN_VERSION "\n"
-                     "Minimal Linux camera app\n"
-                     "Author: Santiago Silva (Y3E)\n"
-                     "License: MIT\n"
-                     "Built: " __DATE__);
-            state->notification = msg;
-            state->notification_until = time(nullptr) + 5;
-            break;
-        }
         default: break;
     }
 }
@@ -625,15 +554,12 @@ static void draw_check(Display *dpy, Window win, GC gc, uint32_t col, int x, int
 }
 
 // ── hittest ───────────────────────────────────────────────────────────────────
-// Returns the item index whose row contains pixel y, or -1 for non-interactable.
-// Uses the same accumulator logic as draw_popup so they can never drift.
 
 static int hittest_items(const std::vector<MenuItem> &items, int my) {
     int y = MENU_PAD_Y;
     for (int i = 0; i < (int)items.size(); i++) {
         int row_h = (items[i].type == ItemType::Separator) ? MENU_SEP_H : MENU_ITEM_H;
         if (my >= y && my < y + row_h) {
-            // separators and headers are not interactive
             if (items[i].type == ItemType::Separator ||
                 items[i].type == ItemType::Header    ||
                 items[i].disabled)
@@ -645,7 +571,6 @@ static int hittest_items(const std::vector<MenuItem> &items, int my) {
     return -1;
 }
 
-// y offset of item[idx] within the popup
 static int item_y(const std::vector<MenuItem> &items, int idx) {
     int y = MENU_PAD_Y;
     for (int i = 0; i < (int)items.size(); i++) {
@@ -671,7 +596,7 @@ struct PopupCtx {
 
 static Window create_popup(Display *dpy, int screen, int x, int y, int w, int h) {
     XSetWindowAttributes attrs = {};
-    attrs.override_redirect = True;
+    attrs.override_redirect  = True;
     attrs.background_pixel   = 0;
     attrs.border_pixel        = 0;
     attrs.colormap            = DefaultColormap(dpy, screen);
@@ -728,7 +653,6 @@ static void draw_popup(PopupCtx &ctx) {
             continue;
         }
 
-        // highlight if hovered OR if this is the submenu currently open
         bool hov = (i == ctx.hover) || (i == ctx.open_sub);
         if (hov)
             fill_round(dpy, win, gc, hi_bg, 4, y, ctx.w-8, MENU_ITEM_H-2, 4);
@@ -764,8 +688,6 @@ static void draw_popup(PopupCtx &ctx) {
 }
 
 // ── popup runner ─────────────────────────────────────────────────────────────
-// One event loop owns the full stack of visible menus. This avoids recursive
-// grabs, so a submenu closing on dehover never blocks the parent menu.
 
 struct MenuLevel {
     PopupCtx ctx;
