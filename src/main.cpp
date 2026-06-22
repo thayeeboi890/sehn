@@ -59,23 +59,26 @@ int main(int argc, char* argv[])
     // 1. start with defaults
     AppState state = make_default_state();
 
-    // 2. load config file
+    // 2. ensure config directory and default files exist
+    files_init_config();
+
+    // 3. load config file
     const char* config_path = find_config_arg(argc, argv);
     if (config_path)
         state.config_path = config_path;
     config_load(&state, config_path);
 
-    // 3. parse CLI
+    // 4. parse CLI
     cli_parse(argc, argv, &state);
     log_init(&state);
 
-    // 4. apply theme
+    // 5. apply theme
     if (!state.theme.empty()) {
         LOG_DEBUG("applying theme: %s", state.theme.c_str());
         config_apply_theme(&state, state.theme.c_str());
     }
 
-    // 5. early-exit commands
+    // 6. early-exit commands
     if (state.list_devices_and_exit)
         return list_devices();
     if (state.list_formats_and_exit)
@@ -87,7 +90,7 @@ int main(int argc, char* argv[])
         return 0;
     }
 
-    // 6. signals
+    // 7. signals
     signals_init(&state);
     if (files_init_output_dir(&state) < 0) {
         LOG_ERROR("failed to create output dir: %s", state.output_dir.c_str());
@@ -99,14 +102,14 @@ int main(int argc, char* argv[])
     } else {
         LOG_DEBUG("font: %s", state.font_path.c_str());
     }
-    // 7. open camera
+    // 8. open camera
     LOG_INFO("attempting to open %s", state.device.c_str());
     if (camera_open(&state) < 0) {
         LOG_ERROR("failed to open device %s", state.device.c_str());
         return 1;
     }
 
-    // 8. start streaming
+    // 9. start streaming
     if (camera_start(&state) < 0) {
         camera_close(&state);
         return 1;
@@ -114,7 +117,7 @@ int main(int argc, char* argv[])
 
     LOG_INFO("sehn: streaming from %s at %ux%u\n", state.device.c_str(), state.width, state.height);
 
-    // 9. run ui
+    // 10. run ui
     int ret = ui_run(&state);
     camera_close(&state);
     return ret;

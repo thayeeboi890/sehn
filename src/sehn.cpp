@@ -53,7 +53,7 @@ AppState make_default_state()
     s.zoom = 1.0f;
     s.pan_x = 0;
     s.pan_y = 0;
-    s.output_dir = ".";
+    s.output_dir = "~/Pictures/sehn";
     s.filename_pattern = "sehn_%Y%m%d_%H%M%S_##";
     s.save_format = "jpeg";
     s.jpeg_quality = 92;

@@ -24,6 +24,8 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 #include "files.h"
+#include "resources.h"
+#include "utils.h"
 #include <cerrno>
 #include <cstdio>
 #include <cstdlib>
@@ -31,6 +33,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <sys/stat.h>
 #include <unistd.h>
 #include <filesystem>
+#include <fstream>
 #include <string>
 
 // platform-specific includes for files_find_font
@@ -116,6 +119,59 @@ int files_mkdir_p(const std::string& path)
         perror("mkdir");
         return -1;
     }
+
+    return 0;
+}
+
+static std::string default_config_dir()
+{
+    const char* xdg = getenv("XDG_CONFIG_HOME");
+    std::string base;
+    if (xdg && *xdg)
+        base = xdg;
+    else {
+        const char* home = getenv("HOME");
+        if (!home)
+            return "";
+        base = std::string(home) + "/.config";
+    }
+    return base + "/sehn";
+}
+
+static void write_default_file(const std::string& path, const char* content)
+{
+    std::ofstream out(path);
+    if (out.is_open()) {
+        out << content;
+        LOG_INFO("created default %s", path.c_str());
+    } else {
+        LOG_WARN("failed to create %s", path.c_str());
+    }
+}
+
+int files_init_config()
+{
+    std::string dir = default_config_dir();
+    if (dir.empty())
+        return -1;
+
+    // create config directory
+    if (files_mkdir_p(dir) < 0) {
+        LOG_WARN("could not create config dir %s", dir.c_str());
+        return -1;
+    }
+
+    // write default files if missing
+    auto write_if_missing = [&](const std::string& name, const char* content) {
+        std::string path = dir + "/" + name;
+        struct stat st;
+        if (stat(path.c_str(), &st) != 0)
+            write_default_file(path, content);
+    };
+
+    write_if_missing("sehnrc.toml", resources::sehnrc);
+    write_if_missing("themes.toml", resources::themes);
+    write_if_missing("keys.toml",   resources::keys);
 
     return 0;
 }

@@ -43,3 +43,9 @@ int files_init_output_dir(AppState* state);
 // Find yudit.ttf — checks next to binary first, then system paths.
 std::string files_find_font();
 
+// Ensure the config directory and default files exist.
+// Creates ~/.config/sehn/ and writes default sehnrc.toml, themes.toml,
+// and keys.toml from built-in resources if they are missing.
+// Should be called early in startup, before config_load.
+int files_init_config();
+
