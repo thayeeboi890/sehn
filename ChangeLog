@@ -1,4 +1,4 @@
-Mon, 22 Jun 2026 12:00:00 +0200  Santiago Silva <santiago@silva.dev>
+Mon, 22 Jun 2026 12:00:00 +0200  Santiago Silva <thayeeboi890@gmail.com>
 
 * Release v0.1.0
     * Initial release of sehn, a simple minimal camera viewer for X11
@@ -27,3 +27,4 @@ Mon, 22 Jun 2026 12:00:00 +0200  Santiago Silva <santiago@silva.dev>
     * Built-in default config creation on first run
     * Global and session capture counters
     * MIT license
+
