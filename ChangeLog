@@ -1,1 +1,29 @@
+Mon, 22 Jun 2026 12:00:00 +0200  Santiago Silva <santiago@silva.dev>
 
+* Release v0.1.0
+    * Initial release of sehn, a simple minimal camera viewer for X11
+    * V4L2 camera support with format negotiation (MJPEG, YUYV, NV12, H.264)
+    * Photo capture to JPEG/PNG with configurable quality/compression
+    * Video recording to MKV/MP4/AVI via FFmpeg (H.264 + AAC audio)
+    * Burst mode with configurable frame count and interval
+    * PulseAudio audio capture for video recording
+    * X11 viewfinder window with XShm accelerated rendering
+    * Right-hand panel with mode selector, shutter, and folder buttons
+    * Right-click context menu with device/format/audio/control settings
+    * Info overlay showing mode, resolution, framerate, and recording status
+    * Flash animation on capture
+    * TOML-based configuration (sehnrc.toml, themes.toml, keys.toml)
+    * Customizable keybindings with modifier support (Ctrl, Shift, Alt, Super)
+    * Theme system with dark/light variants and HiDPI DPI scaling
+    * PTZ controls (pan, tilt, zoom) for supported cameras
+    * Exposure, gain, white balance, and autofocus camera controls
+    * EXIF metadata injection (optional, requires libexif)
+    * V4L2 device, format, and control enumeration commands
+    --list-devices, --list-formats, --list-controls
+    * POSIX signal handling (SIGUSR1 capture, SIGUSR2 mode cycle, SIGHUP reload)
+    * Borderless and fullscreen modes
+    * Desktop entry with camera MIME type associations
+    * SVG icon for freedesktop.org compatibility
+    * Built-in default config creation on first run
+    * Global and session capture counters
+    * MIT license
