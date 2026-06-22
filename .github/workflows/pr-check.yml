@@ -1,0 +1,45 @@
+name: Pull Request Build Check
+
+on: [pull_request]
+
+jobs:
+  test-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Check out the repository code so the runner can see it
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Step 2: Install all your required system dependencies
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            meson \
+            ninja-build \
+            pkg-config \
+            cmake \
+            libx11-dev \
+            libxext-dev \
+            libjpeg-dev \
+            libpng-dev \
+            libv4l-dev \
+            libavcodec-dev \
+            libavformat-dev \
+            libavutil-dev \
+            libswscale-dev \
+            libswresample-dev \
+            libpulse-dev \
+            libxft-dev \
+            libcairo2-dev \
+            libexif-dev \
+            libcurl4-openssl-dev
+
+      # Step 3: Set up the Meson build directory
+      - name: Meson Setup
+        run: meson setup builddir
+
+      # Step 4: Compile the application using Ninja (via Meson)
+      - name: Meson Compile
+        run: meson compile -C builddir
