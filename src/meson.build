@@ -22,8 +22,4 @@ sources = files(
   'menu.cpp',
 )
 
-executable('sehn',
-  sources,
-  dependencies : deps,
-  include_directories : include_directories('.'),
-  install : true)
+

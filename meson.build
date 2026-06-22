@@ -1,10 +1,12 @@
 project('sehn', 'cpp',
   version : '0.1.0',
   license : 'MIT',
+  meson_version : '>= 0.55.0',
   default_options : [
     'cpp_std=c++17',
     'warning_level=2',
     'buildtype=release',
+    'prefix=/usr',
   ])
 
 # ── dependencies ────────────────────────────────────────────────────────────────
@@ -58,6 +60,14 @@ subdir('share/applications')
 subdir('share/images')
 subdir('share/fonts')
 
+# ── executable ──────────────────────────────────────────────────────────────────
+
+executable('sehn',
+  sources,
+  dependencies : deps,
+  include_directories : include_directories('src'),
+  install : true)
+
 # ── install: docs ───────────────────────────────────────────────────────────────
 
 install_data(
@@ -68,12 +78,6 @@ install_data(
 
 install_subdir('examples',
   install_dir : get_option('datadir') / 'sehn')
-
-# ── install: fonts ──────────────────────────────────────────────────────────────
-
-install_subdir('share/fonts',
-  install_dir : get_option('datadir') / 'fonts' / 'sehn',
-  strip_directory : true)
 
 # ── tests ───────────────────────────────────────────────────────────────────────
 

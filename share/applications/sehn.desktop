@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=sehn
+Comment=Simple, Minimal Camera Viewer
+Exec=sehn %F
+Icon=sehn
+Terminal=false
+Type=Application
+Categories=Graphics;Photography;Video;
