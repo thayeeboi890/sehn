@@ -1,5 +1,7 @@
 # sehn - Simple, Minimal Camera Viewer
 
+<img width="512" height="512" alt="sehn1" src="https://github.com/user-attachments/assets/a4d62f0b-ae3c-42c3-b318-0d0362fef102" />
+
 **sehn** is a light-weight, configurable V4L2 camera viewer and capture tool for X11.
 It is inspired by [feh](https://feh.finalrewind.org/) and follows the same philosophy:
 no toolkits, no bloat, do one thing well.
