@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=sehn
+Name[en_US]=sehn
+GenericName=Camera Viewer
+GenericName[en_US]=Camera Viewer
+Comment=Simple, minimal camera viewer
+Exec=sehn %F
+Terminal=false
+Type=Application
+Icon=sehn
+Categories=Graphics;Photography;Video;Viewer;
+InitialPreference=9
