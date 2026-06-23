@@ -1,0 +1,45 @@
+name: Production Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-and-upload:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            meson ninja-build pkg-config cmake libx11-dev libxext-dev libjpeg-dev \
+            libpng-dev libv4l-dev libavcodec-dev libavformat-dev libavutil-dev \
+            libswscale-dev libswresample-dev libpulse-dev libxft-dev libcairo2-dev \
+            libexif-dev libcurl4-openssl-dev ruby ruby-dev build-essential \
+            rpm
+          sudo gem install --no-document fpm
+
+      - name: Meson Build & Stage
+        run: |
+          meson setup builddir --prefix=/usr
+          meson compile -C builddir
+          meson install -C builddir --destdir ../dist
+
+      - name: Package with FPM
+        run: |
+          VERSION=$(echo "${{ github.event.release.tag_name }}" | sed 's/v//')
+          fpm -s dir -t deb -n "sehn" -v "$VERSION" -C dist .
+          fpm -s dir -t rpm -n "sehn" -v "$VERSION" -C dist .
+
+      - name: Upload Artifacts to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            *.deb
+            *.rpm
