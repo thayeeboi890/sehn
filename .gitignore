@@ -18,6 +18,10 @@ CMakeCache.txt
 cmake_install.cmake
 Makefile
 
+# Github runner files
+events.json
+*.key
+
 # Compiled object files and libraries
 *.o
 *.obj
