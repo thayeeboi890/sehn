@@ -8,7 +8,6 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
       - name: Install PPA Tools & Dependencies
         run: |
           sudo apt-get update
@@ -17,7 +16,6 @@ jobs:
             libpng-dev libv4l-dev libavcodec-dev libavformat-dev libavutil-dev \
             libswscale-dev libswresample-dev libpulse-dev libxft-dev libcairo2-dev \
             libexif-dev libcurl4-openssl-dev devscripts debhelper dput
-
       - name: Configure GPG for headless signing
         run: |
           mkdir -p ~/.gnupg
@@ -34,45 +32,36 @@ jobs:
           EOF
           chmod 600 ~/.gnupg/*.conf
           gpgconf --kill gpg-agent
-          gpg-agent --daemon --allow-loopback-pinentry
-
       - name: Import GPG Key for Launchpad
         id: import-gpg
         uses: crazy-max/ghaction-import-gpg@v6
         with:
           gpg_private_key: ${{ secrets.LAUNCHPAD_GPG_KEY }}
           passphrase: ${{ secrets.LAUNCHPAD_GPG_PASSPHRASE }}
-
       - name: Restore allow-loopback-pinentry in gpg-agent
         run: |
           if ! grep -q "allow-loopback-pinentry" ~/.gnupg/gpg-agent.conf 2>/dev/null; then
             echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
           fi
-
       - name: Download meson subprojects
         run: meson subprojects download
-
       - name: Create Debian Changelog & Source Package
         run: |
           VERSION=$(echo "${{ github.event.release.tag_name }}" | sed 's/v//')
           KEYID="${{ steps.import-gpg.outputs.fingerprint }}"
-
           mkdir -p debian/source
           echo "3.0 (quilt)" > debian/source/format
-
           cat <<EOF > debian/copyright
           Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
           Upstream-Name: sehn
           Upstream-Contact: Y3E <thayeeboi890@gmail.com>
           License: MIT
           EOF
-
           cat <<EOF > debian/changelog
           sehn ($VERSION-1~ubuntu24.04) noble; urgency=medium
             * Automated production release of sehn $VERSION.
            -- Y3E <thayeeboi890@gmail.com>  $(date -R)
           EOF
-
           cat <<EOF > debian/control
           Source: sehn
           Section: utils
@@ -81,25 +70,20 @@ jobs:
           XSBC-Original-Maintainer: Y3E <thayeeboi890@gmail.com>
           Build-Depends: debhelper-compat (= 13), cmake, pkgconf, meson, ninja-build, libx11-dev, libxext-dev, libjpeg-dev, libpng-dev, libv4l-dev, libavcodec-dev, libavformat-dev, libavutil-dev, libswscale-dev, libswresample-dev, libpulse-dev, libxft-dev, libcairo2-dev, libexif-dev, libcurl4-openssl-dev
           Standards-Version: 4.6.2
-
           Package: sehn
           Architecture: any
           Depends: \${shlibs:Depends}, \${misc:Depends}
           Description: Core binaries for the sehn package engine.
           EOF
-
           cat <<EOF > debian/rules
           #!/usr/bin/make -f
           %:
           	dh \$@
           EOF
           chmod +x debian/rules
-
           tar --exclude='./debian' --exclude='./.git' --exclude='./builddir' \
               -cJf ../sehn_${VERSION}.orig.tar.xz .
-
           debuild -S -sa -k"$KEYID"
-
       - name: Upload Source Package to Launchpad PPA
         run: |
           VERSION=$(echo "${{ github.event.release.tag_name }}" | sed 's/v//')

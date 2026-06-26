@@ -1,9 +1,7 @@
 name: Upload to Arch Linux AUR
-
 on:
   release:
     types: [published]
-
 jobs:
   aur-upload:
     runs-on: ubuntu-latest
@@ -13,35 +11,32 @@ jobs:
         run: |
           pacman -Syu --noconfirm
           pacman -S --noconfirm git openssh meson ninja gcc pkgconf libx11 libxext libjpeg-turbo libpng libv4l ffmpeg pulseaudio cairo libexif curl sudo
-
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Setup SSH and Clone AUR Repository
         run: |
           mkdir -p ~/.ssh
           printf '%s' "${{ secrets.AUR_SSH_PRIVATE_KEY }}" | base64 -d > ~/.ssh/aur_key
           chmod 600 ~/.ssh/aur_key
-          ssh-agent -s > ~/.ssh/agent.env
-          . ~/.ssh/agent.env
+          eval $(ssh-agent -s)
           printf '%s' "${{ secrets.AUR_SSH_KEY_PASSPHRASE }}" > /tmp/aur_pass.txt
           cat > /tmp/askpass.sh << 'SCRIPT'
           #!/bin/sh
           cat /tmp/aur_pass.txt
           SCRIPT
           chmod +x /tmp/askpass.sh
-          SSH_ASKPASS_REQUIRE=force SSH_ASKPASS=/tmp/askpass.sh DISPLAY=none ssh-add ~/.ssh/aur_key
-          ssh-keyscan -t ed25519 -T 10 aur.archlinux.org >> ~/.ssh/known_hosts 2>/dev/null || true
-          timeout 30 git clone ssh://aur@aur.archlinux.org/sehn.git /tmp/aur-repo
-
+          ssh-keyscan -t ed25519 aur.archlinux.org >> ~/.ssh/known_hosts
+          SSH_ASKPASS_REQUIRE=force SSH_ASKPASS=/tmp/askpass.sh ssh-add ~/.ssh/aur_key
+          GIT_SSH_COMMAND="ssh -i ~/.ssh/aur_key -o StrictHostKeyChecking=yes" \
+            git clone ssh://aur@aur.archlinux.org/sehn.git /tmp/aur-repo
       - name: Generate PKGBUILD and .SRCINFO
         run: |
           VERSION=$(echo "${{ github.event.release.tag_name }}" | sed 's/v//')
-          
+
           cat << EOF > /tmp/aur-repo/PKGBUILD
-          # Maintainer: ${{ secrets.AUR_USERNAME }} 
+          # Maintainer: ${{ secrets.AUR_USERNAME }}
           pkgname=sehn
           pkgver=${VERSION}
           pkgrel=1
@@ -55,31 +50,29 @@ jobs:
           makedepends=('meson' 'ninja' 'gcc' 'pkgconf')
           source=("https://github.com/thayeeboi890/sehn/archive/refs/tags/v\${pkgver}.tar.gz")
           sha256sums=('SKIP')
-
           build() {
             arch-meson "\$srcdir/sehn-\$pkgver" build --wrap-mode forcefallback
             ninja -C build
           }
-
           package() {
             DESTDIR="\$pkgdir" ninja -C build install
           }
           EOF
-
           cd /tmp/aur-repo
           chmod 777 .
           sudo -u nobody makepkg --printsrcinfo > .SRCINFO
-
       - name: Commit and Push to AUR
         run: |
           cd /tmp/aur-repo
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git add PKGBUILD .SRCINFO
-          
+
           if ! git diff-index --quiet HEAD; then
             git commit -m "Automated AUR release v$(echo "${{ github.event.release.tag_name }}" | sed 's/v//')"
-            . ~/.ssh/agent.env
-            SSH_ASKPASS_REQUIRE=force SSH_ASKPASS=/tmp/askpass.sh DISPLAY=none ssh-add ~/.ssh/aur_key 2>/dev/null || true
-            git push origin master
+            eval $(ssh-agent -s)
+            printf '%s' "${{ secrets.AUR_SSH_KEY_PASSPHRASE }}" > /tmp/aur_pass.txt
+            SSH_ASKPASS_REQUIRE=force SSH_ASKPASS=/tmp/askpass.sh ssh-add ~/.ssh/aur_key
+            GIT_SSH_COMMAND="ssh -i ~/.ssh/aur_key -o StrictHostKeyChecking=yes" \
+              git push origin master
           fi
