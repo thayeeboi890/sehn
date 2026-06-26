@@ -1,9 +1,7 @@
 name: Upload to Fedora COPR
-
 on:
   release:
     types: [published]
-
 jobs:
   copr-upload:
     runs-on: ubuntu-latest
@@ -11,30 +9,24 @@ jobs:
     steps:
       - name: Install System Build Tooling
         run: dnf install -y git meson ninja-build rpm-build rpmdevtools copr-cli
-
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
       - name: Download meson subprojects
         run: meson subprojects download
-
       - name: Generate Spec File, Tarball, and SRPM
         run: |
           VERSION=$(echo "${{ github.event.release.tag_name }}" | sed 's/v//')
 
-          # 1. Create the .spec file dynamically inside the runner
           cat << 'EOF' > sehn.spec
           Name:           sehn
-          Version:        $VERSION
+          Version:        PKGVERSION
           Release:        1%{?dist}
           Summary:        Core binaries for the sehn package engine
-
           License:        MIT
           URL:            https://github.com/thayeeboi890/sehn
-          Source0:        %{name}-%{version}.tar.gz
-
+          Source0:        %{name}-PKGVERSION.tar.gz
           BuildRequires:  meson
           BuildRequires:  ninja-build
           BuildRequires:  gcc-c++
@@ -50,20 +42,15 @@ jobs:
           BuildRequires:  cairo-devel
           BuildRequires:  libexif-devel
           BuildRequires:  libcurl-devel
-
           %description
           Core binaries for the sehn package engine.
-
           %prep
-          %autosetup -n %{name}-%{version}
-
+          %autosetup -n %{name}-PKGVERSION
           %build
           %meson
           %meson_build
-
           %install
           %meson_install
-
           %files
           %{_bindir}/sehn
           %{_datadir}/applications/sehn.desktop
@@ -71,36 +58,28 @@ jobs:
           %{_datadir}/doc/sehn/*
           %{_datadir}/fonts/sehn/*
           %{_mandir}/man1/sehn.1*
-
           %changelog
-          * Wed Jun 24 2026 Y3E <thayeeboi890@gmail.com> - ${VERSION}-1
-          - Automated production release of sehn $VERSION
+          * Wed Jun 24 2026 Y3E <thayeeboi890@gmail.com> - PKGVERSION-1
+          - Automated production release of sehn PKGVERSION
           EOF
 
-          # Dynamic version injection into spec
-          sed -i "s/\$VERSION/$VERSION/g" sehn.spec
+          sed -i "s/PKGVERSION/$VERSION/g" sehn.spec
 
-          # 2. Set up standard RPM directory tree structure
           rpmdev-setuptree
 
-          # 3. Create the source tarball matching what %autosetup expects
           mkdir sehn-${VERSION}
           find . -maxdepth 1 ! -name "sehn-${VERSION}" ! -name "." -exec cp -r {} sehn-${VERSION}/ \;
           tar --exclude="sehn-${VERSION}/.git" -czf /root/rpmbuild/SOURCES/sehn-${VERSION}.tar.gz sehn-${VERSION}
 
-          # 4. Build the Source RPM package (.src.rpm)
           rpmbuild -bs sehn.spec --define "_topdir /root/rpmbuild"
-          
-          # 5. Move the generated package file to workspace for the next step
-          mv /root/rpmbuild/SRPMS/*.src.rpm .
 
+          mv /root/rpmbuild/SRPMS/*.src.rpm .
       - name: Authenticate and Upload to COPR
         env:
           COPR_LOGIN: ${{ secrets.COPR_LOGIN }}
           COPR_USERNAME: ${{ secrets.COPR_USERNAME }}
           COPR_TOKEN: ${{ secrets.COPR_TOKEN }}
         run: |
-          # Configure native copr-cli credentials on the fly
           mkdir -p ~/.config
           cat << EOF > ~/.config/copr
           [copr-cli]
@@ -110,5 +89,4 @@ jobs:
           copr_url = https://copr.fedorainfracloud.org
           EOF
 
-          # Upload directly via native package tooling
           copr-cli build y3e-890/sehn *.src.rpm
