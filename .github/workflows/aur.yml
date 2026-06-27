@@ -17,9 +17,9 @@ jobs:
           fetch-depth: 0
       - name: Setup SSH and Clone AUR Repository
         run: |
-          mkdir -p ~/.ssh
-          printf '%s' "${{ secrets.AUR_SSH_PRIVATE_KEY }}" | base64 -d > ~/.ssh/aur_key
-          chmod 600 ~/.ssh/aur_key
+          mkdir -p /github/home/.ssh
+          printf '%s' "${{ secrets.AUR_SSH_PRIVATE_KEY }}" | base64 -d > /github/home/.ssh/aur_key
+          chmod 600 /github/home/.ssh/aur_key
           eval $(ssh-agent -s)
           printf '%s' "${{ secrets.AUR_SSH_KEY_PASSPHRASE }}" > /tmp/aur_pass.txt
           cat > /tmp/askpass.sh << 'SCRIPT'
@@ -27,10 +27,9 @@ jobs:
           cat /tmp/aur_pass.txt
           SCRIPT
           chmod +x /tmp/askpass.sh
-          ssh-keyscan -t ed25519 aur.archlinux.org >> ~/.ssh/known_hosts
-          cat ~/.ssh/known_hosts
-          SSH_ASKPASS_REQUIRE=force SSH_ASKPASS=/tmp/askpass.sh ssh-add ~/.ssh/aur_key
-          GIT_SSH_COMMAND="ssh -i ~/.ssh/aur_key -o StrictHostKeyChecking=yes" \
+          ssh-keyscan -t ed25519 aur.archlinux.org >> /github/home/.ssh/known_hosts
+          SSH_ASKPASS_REQUIRE=force SSH_ASKPASS=/tmp/askpass.sh ssh-add /github/home/.ssh/aur_key
+          GIT_SSH_COMMAND="ssh -i /github/home/.ssh/aur_key -o UserKnownHostsFile=/github/home/.ssh/known_hosts -o StrictHostKeyChecking=yes" \
             git clone ssh://aur@aur.archlinux.org/sehn.git /tmp/aur-repo
       - name: Generate PKGBUILD and .SRCINFO
         run: |
@@ -73,7 +72,7 @@ jobs:
             git commit -m "Automated AUR release v$(echo "${{ github.event.release.tag_name }}" | sed 's/v//')"
             eval $(ssh-agent -s)
             printf '%s' "${{ secrets.AUR_SSH_KEY_PASSPHRASE }}" > /tmp/aur_pass.txt
-            SSH_ASKPASS_REQUIRE=force SSH_ASKPASS=/tmp/askpass.sh ssh-add ~/.ssh/aur_key
-            GIT_SSH_COMMAND="ssh -i ~/.ssh/aur_key -o StrictHostKeyChecking=yes" \
+            SSH_ASKPASS_REQUIRE=force SSH_ASKPASS=/tmp/askpass.sh ssh-add /github/home/.ssh/aur_key
+            GIT_SSH_COMMAND="ssh -i /github/home/.ssh/aur_key -o UserKnownHostsFile=/github/home/.ssh/known_hosts -o StrictHostKeyChecking=yes" \
               git push origin master
           fi
