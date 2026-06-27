@@ -12,7 +12,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            meson ninja-build pkg-config cmake libx11-dev libxext-dev libjpeg-dev \
+            build-essential meson ninja-build pkg-config cmake libx11-dev libxext-dev libjpeg-dev \
             libpng-dev libv4l-dev libavcodec-dev libavformat-dev libavutil-dev \
             libswscale-dev libswresample-dev libpulse-dev libxft-dev libcairo2-dev \
             libexif-dev libcurl4-openssl-dev devscripts debhelper dput
