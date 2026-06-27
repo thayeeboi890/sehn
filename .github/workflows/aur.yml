@@ -27,7 +27,7 @@ jobs:
           cat /tmp/aur_pass.txt
           SCRIPT
           chmod +x /tmp/askpass.sh
-          ssh-keyscan -t ed25519 aur.archlinux.org >> ~/.ssh/known_hosts
+          ssh-keyscan -t ed25519 aur.archlinux.org 2>&1 | tee -a ~/.ssh/known_hosts
           SSH_ASKPASS_REQUIRE=force SSH_ASKPASS=/tmp/askpass.sh ssh-add ~/.ssh/aur_key
           GIT_SSH_COMMAND="ssh -i ~/.ssh/aur_key -o StrictHostKeyChecking=yes" \
             git clone ssh://aur@aur.archlinux.org/sehn.git /tmp/aur-repo
