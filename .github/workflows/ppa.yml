@@ -70,6 +70,7 @@ jobs:
           XSBC-Original-Maintainer: Y3E <thayeeboi890@gmail.com>
           Build-Depends: debhelper-compat (= 13), cmake, pkgconf, meson, ninja-build, libx11-dev, libxext-dev, libjpeg-dev, libpng-dev, libv4l-dev, libavcodec-dev, libavformat-dev, libavutil-dev, libswscale-dev, libswresample-dev, libpulse-dev, libxft-dev, libcairo2-dev, libexif-dev, libcurl4-openssl-dev
           Standards-Version: 4.6.2
+
           Package: sehn
           Architecture: any
           Depends: \${shlibs:Depends}, \${misc:Depends}

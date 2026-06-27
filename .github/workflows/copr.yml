@@ -66,6 +66,7 @@ jobs:
           sed -i "s/PKGVERSION/$VERSION/g" sehn.spec
 
           rpmdev-setuptree
+          mkdir -p /root/rpmbuild/SOURCES
 
           mkdir sehn-${VERSION}
           find . -maxdepth 1 ! -name "sehn-${VERSION}" ! -name "." -exec cp -r {} sehn-${VERSION}/ \;
